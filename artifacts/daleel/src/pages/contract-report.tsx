@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useTranslation } from "@/lib/i18n";
 import { useGetContract, useDeleteContract, useExportContract } from "@workspace/api-client-react";
 import { 
@@ -31,8 +31,7 @@ export default function ContractReport() {
   const id = parseInt(params.id || "0", 10);
   const { t, language } = useTranslation();
   const { toast } = useToast();
-  const [, setLocation] = React.useState<string | null>(null); // For navigation if wouter hook is used this way, wait useLocation
-  const [loc, nav] = require("wouter").useLocation();
+  const [, nav] = useLocation();
   
   const isRtl = language === "ar";
   const BackIcon = isRtl ? ArrowRight : ArrowLeft;
