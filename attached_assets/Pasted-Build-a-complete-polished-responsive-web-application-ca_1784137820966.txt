@@ -1,0 +1,974 @@
+Build a complete, polished, responsive web application called **Daleel | دليل**.
+
+Daleel is an AI-powered platform that helps users understand contracts, subscriptions, terms and conditions, and service agreements before accepting or signing them.
+
+The user uploads a PDF, image, or pasted contract text. The AI analyzes it and converts it into a clear, simple report showing important terms, costs, dates, cancellation rules, automatic renewal, penalties, refunds, privacy clauses, obligations, and potential risks.
+
+The application must be functional, not just a static design or landing page.
+
+---
+
+# Product Identity
+
+Arabic name: **دليل**
+
+English name: **Daleel**
+
+Arabic slogan:
+
+**افهم قبل أن توافق**
+
+English slogan:
+
+**Understand before you agree**
+
+Arabic should be the default language with full RTL support.
+
+The website must also support English with correct LTR layout.
+
+---
+
+# Core Product Experience
+
+The main user journey should be:
+
+1. User opens the website.
+2. User uploads a PDF or image of a contract, or pastes contract text.
+3. User selects the contract type.
+4. The AI analyzes the contract.
+5. The user sees a clear structured report.
+6. The user can ask questions about the contract.
+7. The user can save, download, compare, or create reminders from the contract.
+
+The application should support:
+
+* PDF contracts.
+* Scanned contract images.
+* JPG, PNG, and WEBP images.
+* Pasted text.
+* Arabic contracts.
+* English contracts.
+* Contracts containing both Arabic and English.
+
+---
+
+# Main Use Cases
+
+Support these contract categories:
+
+* Rental agreements.
+* Employment contracts.
+* Gym and membership subscriptions.
+* Internet and telecommunications contracts.
+* Software and application subscriptions.
+* Service agreements.
+* Insurance documents.
+* Car financing or installment agreements.
+* Travel and hotel terms.
+* Education and training contracts.
+
+For the initial version, optimize the system especially for:
+
+* Rental agreements.
+* Subscription contracts.
+* Employment contracts.
+
+---
+
+# AI Contract Analysis
+
+The AI should extract and organize the following information:
+
+* Contract type.
+* Contract title.
+* Parties involved.
+* Start date.
+* End date.
+* Contract duration.
+* Total price.
+* Monthly payment.
+* Annual payment.
+* Taxes.
+* Additional fees.
+* Deposit.
+* Payment schedule.
+* Automatic renewal.
+* Renewal duration.
+* Cancellation conditions.
+* Cancellation notice period.
+* Early cancellation penalty.
+* Refund policy.
+* Trial period.
+* Warranty.
+* User obligations.
+* Company obligations.
+* Privacy and data-sharing clauses.
+* Dispute resolution.
+* Important deadlines.
+* Unusual or unclear clauses.
+* Missing or ambiguous information.
+
+The result must be returned as structured validated JSON and then displayed in a polished report.
+
+Example AI result:
+
+```json
+{
+  "contractType": "gym_membership",
+  "title": "Annual Gym Membership",
+  "summary": "A 12-month gym membership with monthly payments and automatic renewal.",
+  "parties": [
+    "Customer",
+    "Fitness Center"
+  ],
+  "startDate": "2026-08-01",
+  "endDate": "2027-07-31",
+  "duration": "12 months",
+  "totalCost": 2400,
+  "currency": "SAR",
+  "monthlyPayment": 200,
+  "automaticRenewal": true,
+  "renewalNoticeDays": 30,
+  "cancellationAllowed": true,
+  "earlyCancellationPenalty": 500,
+  "refundPolicy": "No refund after the membership begins",
+  "importantClauses": [
+    {
+      "title": "Automatic renewal",
+      "description": "The membership renews automatically unless cancelled 30 days before expiry.",
+      "riskLevel": "high",
+      "sourcePage": 4,
+      "sourceText": "The membership will automatically renew..."
+    }
+  ],
+  "clarityScore": 62,
+  "confidence": 0.91
+}
+```
+
+Validate the AI result on the server before saving or displaying it.
+
+Never display private chain-of-thought reasoning. Only display clear summaries and concise explanations.
+
+---
+
+# Risk Levels
+
+Classify important clauses using three levels:
+
+## Low
+
+Normal information the user should know.
+
+Examples:
+
+* Payment is due on the first day of every month.
+* Cancellation requires written notice.
+
+## Medium
+
+A clause that may create an additional commitment.
+
+Examples:
+
+* The contract automatically renews.
+* The company may modify the service price.
+
+## High
+
+A clause that may cause financial loss or significantly limit the user’s rights.
+
+Examples:
+
+* A large early cancellation penalty.
+* No refund under any circumstances.
+* Automatic renewal for another full year.
+* Broad permission to share personal data.
+
+Use colors carefully:
+
+* Green for low.
+* Amber for medium.
+* Red for high.
+
+Do not describe a clause as illegal. Use wording such as:
+
+* “This clause may require additional attention.”
+* “Consider reviewing this clause carefully.”
+* “You may want to ask the provider for clarification.”
+
+---
+
+# Contract Report Page
+
+Create a premium report page containing:
+
+## 1. Overview
+
+Display:
+
+* Contract title.
+* Contract type.
+* Parties.
+* Duration.
+* Total cost.
+* Main status.
+* Overall clarity score.
+* Number of important alerts.
+
+## 2. Important Alerts
+
+Display the most important clauses in cards.
+
+Each card should show:
+
+* Clause title.
+* Simple explanation.
+* Risk level.
+* Source page.
+* Original source text.
+* Button to view the clause in the document.
+
+## 3. Financial Summary
+
+Display:
+
+* Total price.
+* Monthly or annual payments.
+* Additional fees.
+* Taxes.
+* Deposit.
+* Penalties.
+* Refund conditions.
+
+## 4. Dates and Deadlines
+
+Display:
+
+* Start date.
+* End date.
+* Payment dates.
+* Cancellation deadline.
+* Renewal date.
+* Trial period end date.
+* Warranty expiration date.
+
+Allow the user to add dates to reminders.
+
+## 5. Cancellation and Renewal
+
+Display:
+
+* Whether cancellation is allowed.
+* How to cancel.
+* Notice period.
+* Cancellation penalty.
+* Automatic renewal status.
+* Last safe cancellation date.
+
+## 6. Rights and Obligations
+
+Separate into:
+
+* User obligations.
+* Service provider obligations.
+* User rights.
+* Provider rights.
+
+## 7. Privacy
+
+Display:
+
+* Collected data.
+* Data-sharing permissions.
+* Marketing permissions.
+* Data retention details.
+* Account deletion conditions.
+
+## 8. Questions to Ask
+
+Generate suggested questions such as:
+
+* Is the price inclusive of tax?
+* Does the contract renew automatically?
+* Can the service price change during the contract?
+* Is there a cancellation fee?
+* Can I receive a refund?
+* What happens if the provider fails to deliver the service?
+
+Allow the user to copy all questions.
+
+---
+
+# Source Verification
+
+Every important extracted clause must include:
+
+* Page number when available.
+* Original text excerpt.
+* A button called “View source”.
+* A highlighted source area when possible.
+
+The application must not invent page references.
+
+When a source page cannot be determined, display:
+
+“Source location could not be identified.”
+
+The user should always be able to compare the AI explanation with the original contract.
+
+---
+
+# Ask Daleel
+
+Create a chat-style page called:
+
+**اسأل دليل**
+
+The user can ask questions about the uploaded contract.
+
+Examples:
+
+* هل أقدر ألغي العقد بعد شهرين؟
+* كم غرامة الإلغاء؟
+* هل العقد يتجدد تلقائيًا؟
+* متى آخر يوم أقدر ألغي فيه؟
+* هل يحق للشركة رفع السعر؟
+* هل يوجد استرجاع للمبلغ؟
+
+Responses must:
+
+* Be based only on the uploaded contract.
+* Be short and clear.
+* Mention the relevant clause.
+* Include the source page when available.
+* Say clearly when the answer cannot be found.
+
+Example:
+
+“يسمح العقد بالإلغاء المبكر، لكن توجد غرامة قدرها 500 ريال. راجع البند 8 في الصفحة الرابعة.”
+
+When information is unavailable, respond:
+
+“لم أجد إجابة واضحة على هذا السؤال داخل العقد المرفوع.”
+
+---
+
+# Compare Contracts
+
+Create a contract comparison feature.
+
+The user can select two saved contracts and compare:
+
+* Price.
+* Duration.
+* Automatic renewal.
+* Cancellation conditions.
+* Cancellation penalty.
+* Refund policy.
+* Privacy.
+* Warranty.
+* Major risks.
+* Important dates.
+
+Display the result in a responsive comparison table.
+
+Include an AI-generated neutral comparison summary.
+
+Example:
+
+“العقد الأول أقل تكلفة شهريًا، لكن العقد الثاني أسهل في الإلغاء ولا يتجدد تلقائيًا.”
+
+Do not choose the best contract for the user. Present differences clearly and let the user decide.
+
+---
+
+# Contract Clarity Score
+
+Create a clarity score from 0 to 100.
+
+The score may consider:
+
+* Sentence complexity.
+* Length of clauses.
+* Number of unclear terms.
+* Scattered financial information.
+* Missing cancellation details.
+* Excessive legal terminology.
+* Conflicting clauses.
+
+Display:
+
+* Overall score.
+* Explanation of the score.
+* Areas that need clarification.
+
+Example:
+
+**Clarity score: 62/100**
+
+“Cancellation terms are spread across multiple sections, and some additional fees are not clearly explained.”
+
+Make it clear that this score evaluates readability and clarity, not legal validity.
+
+---
+
+# Reminders
+
+Allow users to create reminders for:
+
+* Contract expiration.
+* Automatic renewal.
+* Last cancellation date.
+* Payment date.
+* Trial period expiration.
+* Warranty expiration.
+
+Create an in-app reminders page.
+
+For browser support, include:
+
+* In-app notifications.
+* Email reminder architecture if email credentials are available.
+* Calendar file download or calendar integration where possible.
+
+---
+
+# User Roles
+
+Create two roles:
+
+## Regular User
+
+Can:
+
+* Upload contracts.
+* Analyze contracts.
+* Save reports.
+* Ask questions.
+* Compare contracts.
+* Create reminders.
+* Export reports.
+* Delete contracts.
+
+## Administrator
+
+Can:
+
+* View system usage statistics.
+* View user counts.
+* View analysis counts.
+* View contract categories.
+* View failed AI requests.
+* Manage users.
+* View system activity logs.
+* Configure AI mode.
+* Manage legal disclaimer text.
+
+Administrators must not automatically see private contract content unless explicitly enabled for demo purposes.
+
+---
+
+# Pages and Routes
+
+Create these pages:
+
+## Public Pages
+
+* Landing page.
+* About Daleel.
+* How it works.
+* Supported contract types.
+* Privacy page.
+* Terms page.
+* Login.
+* Register.
+
+## User Pages
+
+* Dashboard.
+* Upload contract.
+* Contract processing page.
+* Contract report.
+* My contracts.
+* Ask Daleel.
+* Compare contracts.
+* Reminders.
+* Account settings.
+
+## Admin Pages
+
+* Admin dashboard.
+* Users.
+* Usage analytics.
+* Processing errors.
+* Activity logs.
+* System settings.
+
+---
+
+# User Dashboard
+
+The dashboard should show:
+
+* Total saved contracts.
+* Contracts with high-risk alerts.
+* Upcoming renewal dates.
+* Upcoming cancellation deadlines.
+* Recently analyzed contracts.
+* Contract categories.
+* Quick upload button.
+
+Include a visible card such as:
+
+“يتجدد عقد الإنترنت بعد 12 يومًا، وآخر موعد للإلغاء دون تجديد هو بعد 5 أيام.”
+
+---
+
+# Upload Experience
+
+Create a polished drag-and-drop upload area.
+
+Supported methods:
+
+* Drag and drop PDF.
+* Choose file.
+* Use camera on mobile.
+* Upload images.
+* Paste text.
+
+Display:
+
+* File name.
+* File type.
+* File size.
+* Upload progress.
+* Remove button.
+* Replace button.
+
+After upload, ask:
+
+* Contract type.
+* Contract language.
+* Preferred explanation level.
+
+Explanation options:
+
+* Very simple.
+* Standard.
+* Detailed.
+
+Allow the user to select:
+
+* Arabic output.
+* English output.
+
+---
+
+# Processing Screen
+
+Create an attractive analysis screen showing actual progress stages:
+
+1. Uploading document.
+2. Extracting text.
+3. Identifying contract type.
+4. Extracting financial details.
+5. Finding renewal and cancellation clauses.
+6. Evaluating important risks.
+7. Building the final report.
+
+Include smooth progress animations.
+
+Do not use a fake endless loader.
+
+If processing fails, display:
+
+* Clear error message.
+* Retry button.
+* Upload another file button.
+
+---
+
+# Demo Mode and Live AI Mode
+
+The application must support two modes.
+
+## Live AI Mode
+
+When an AI API key is configured:
+
+* Analyze PDF text.
+* Analyze scanned images.
+* Extract structured contract information.
+* Answer contract questions.
+* Generate comparison summaries.
+
+Store all API keys securely in environment variables.
+
+Never expose API keys in frontend code.
+
+## Demo Mode
+
+If no API key is available, the website must remain fully usable.
+
+Create realistic demo analysis for at least:
+
+1. Rental agreement.
+2. Gym subscription.
+3. Employment contract.
+4. Internet subscription.
+
+Demo Mode should use the same data format and interface as Live AI Mode.
+
+Add demo login credentials and a sample contract library.
+
+---
+
+# Database
+
+Create a proper relational database.
+
+Suggested models:
+
+## User
+
+* id
+* fullName
+* email
+* passwordHash or authProviderId
+* role
+* preferredLanguage
+* createdAt
+* updatedAt
+
+## Contract
+
+* id
+* userId
+* title
+* contractType
+* originalFileUrl
+* originalFileName
+* language
+* extractedText
+* status
+* clarityScore
+* confidence
+* createdAt
+* updatedAt
+
+## ContractParty
+
+* id
+* contractId
+* name
+* role
+
+## ContractFinancialDetail
+
+* id
+* contractId
+* type
+* amount
+* currency
+* description
+* sourcePage
+* sourceText
+
+## ContractClause
+
+* id
+* contractId
+* category
+* title
+* simpleExplanation
+* riskLevel
+* sourcePage
+* sourceText
+* confidence
+
+## ContractDate
+
+* id
+* contractId
+* type
+* date
+* description
+* sourcePage
+
+## ContractQuestion
+
+* id
+* contractId
+* userId
+* question
+* answer
+* sourcePage
+* createdAt
+
+## Reminder
+
+* id
+* userId
+* contractId
+* title
+* reminderDate
+* type
+* completed
+* createdAt
+
+## ActivityLog
+
+* id
+* userId
+* action
+* entityType
+* entityId
+* createdAt
+
+---
+
+# Design Requirements
+
+The design must feel premium, modern, trustworthy, and professional.
+
+It should look like a polished fintech or legal-tech SaaS product.
+
+## Visual Direction
+
+Use:
+
+* Deep navy as the main brand color.
+* Warm off-white or light gray backgrounds.
+* Teal or emerald accent color.
+* Red only for high-risk warnings.
+* Amber for medium-risk warnings.
+* Green for safe or low-risk information.
+
+Avoid:
+
+* Excessive gradients.
+* Cartoon illustrations.
+* Generic AI robot images.
+* Too many rounded cards.
+* Overly colorful dashboards.
+* Cluttered pages.
+* Huge empty spaces.
+* Lorem ipsum.
+
+## Typography
+
+Use high-quality Arabic and English fonts available through standard web services.
+
+Arabic interface should have:
+
+* Clear headings.
+* Comfortable line spacing.
+* Strong readability.
+* Correct RTL alignment.
+
+## Interface Style
+
+* Elegant sidebar dashboard.
+* Clear top navigation.
+* Soft shadows.
+* Subtle borders.
+* Professional icons.
+* Smooth transitions.
+* Clear hierarchy.
+* Responsive tables.
+* Excellent mobile experience.
+* Light and dark modes.
+* Accessible contrast.
+* Keyboard navigation.
+* Large mobile touch targets.
+
+The landing page should include:
+
+* Strong hero section.
+* Contract upload preview.
+* How Daleel works.
+* Main benefits.
+* Supported contract categories.
+* Example contract analysis.
+* Privacy and security section.
+* Call-to-action.
+* Footer.
+
+Use realistic Arabic content throughout the website.
+
+---
+
+# Mobile Experience
+
+The website must work perfectly on mobile.
+
+The upload and analysis workflow should use a step-by-step experience:
+
+1. Upload contract.
+2. Select contract type.
+3. Analyze.
+4. View alerts.
+5. Review details.
+6. Save or create reminders.
+
+Important information should not require horizontal scrolling.
+
+Comparison tables should become stacked comparison cards on mobile.
+
+---
+
+# Privacy and Security
+
+Contracts may contain sensitive personal information.
+
+Implement:
+
+* Authentication.
+* User-specific access controls.
+* Server-side authorization.
+* Secure file storage.
+* File type validation.
+* File size limits.
+* Sanitized text inputs.
+* Secure environment variables.
+* Ability to permanently delete contracts.
+* Confirmation before deletion.
+* Activity logs.
+* Error handling.
+* AI request timeout and retry.
+* No API keys in frontend code.
+
+Clearly state:
+
+* Contracts are private.
+* Users can delete their files.
+* Files are not used for AI training without permission.
+
+---
+
+# Legal Disclaimer
+
+Display this disclaimer clearly:
+
+Arabic:
+
+“دليل يساعدك على فهم العقود والعثور على البنود المهمة، لكنه لا يقدم استشارة قانونية ولا يستبدل مراجعة محامٍ أو التواصل مع الجهة المختصة.”
+
+English:
+
+“Daleel helps users understand contracts and identify important clauses. It does not provide legal advice and does not replace consultation with a qualified legal professional.”
+
+The disclaimer should appear:
+
+* Before analysis.
+* On the contract report.
+* On the Ask Daleel page.
+* In the footer.
+
+---
+
+# Export
+
+Allow users to export:
+
+* Contract summary as PDF.
+* Full analysis report as PDF.
+* Important dates as CSV.
+* Comparison report as PDF.
+
+PDF reports should include:
+
+* Daleel branding.
+* Contract title.
+* Analysis date.
+* Overview.
+* Important alerts.
+* Financial details.
+* Dates.
+* Cancellation and renewal.
+* Source references.
+* Disclaimer.
+
+---
+
+# Technical Requirements
+
+Use a modern full-stack TypeScript architecture.
+
+Choose a reliable stack supported by Replit, such as:
+
+* React or Next.js.
+* TypeScript.
+* Tailwind CSS.
+* PostgreSQL.
+* Prisma or Drizzle ORM.
+* Secure authentication.
+* Server-side API routes.
+* Schema validation using Zod.
+* PDF text extraction.
+* OCR fallback for scanned documents.
+
+Organize the project properly:
+
+* Reusable UI components.
+* Separate AI service layer.
+* Separate document-processing service.
+* Database service.
+* Authentication middleware.
+* Server-side validation.
+* Clean folder structure.
+* Proper loading and error states.
+
+Do not create the whole project in one large file.
+
+---
+
+# Seed Data
+
+Seed the database with realistic demo data:
+
+* One regular user.
+* One administrator.
+* Four sample contracts.
+* At least twelve important clauses.
+* Multiple reminders.
+* Different risk levels.
+* One contract with automatic renewal.
+* One contract with a cancellation penalty.
+* One contract with a refund condition.
+* One contract with privacy concerns.
+
+Create demo accounts and display their credentials on the login page.
+
+---
+
+# Acceptance Criteria
+
+Before considering the application complete, verify that:
+
+1. User can register and log in.
+2. User can upload a PDF or image.
+3. User can paste contract text.
+4. User can analyze a contract.
+5. The result is saved in the database.
+6. The report displays financial terms.
+7. The report displays cancellation and renewal details.
+8. Important clauses show risk levels.
+9. Source pages and text are displayed.
+10. User can ask questions about the contract.
+11. User can compare two contracts.
+12. User can create reminders.
+13. User can export a PDF report.
+14. User can delete a contract.
+15. Arabic RTL works correctly.
+16. English LTR works correctly.
+17. Mobile layout works correctly.
+18. Light and dark modes work.
+19. Demo Mode works without an AI API key.
+20. All main buttons and routes work.
+21. There are no major console errors.
+22. The website does not contain static fake buttons.
+23. The design looks premium and production-ready.
+
+Start by building the complete functional application and database. After the main flows work correctly, improve the visual design and polish every page.
