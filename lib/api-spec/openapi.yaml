@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Daleel - AI-powered contract analysis platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: contracts
+    description: Contract management
+  - name: clauses
+    description: Contract clause operations
+  - name: questions
+    description: Ask Daleel Q&A
+  - name: reminders
+    description: Reminder management
+  - name: admin
+    description: Admin operations
+  - name: dashboard
+    description: Dashboard summaries
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +38,1117 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ──────────────────────────────────────────────────────
+  # AUTH
+  # ──────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me/settings:
+    patch:
+      operationId: updateSettings
+      tags: [auth]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettingsInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ──────────────────────────────────────────────────────
+  # DASHBOARD
+  # ──────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/upcoming:
+    get:
+      operationId: getUpcomingAlerts
+      tags: [dashboard]
+      summary: Get upcoming renewals and cancellation deadlines
+      responses:
+        "200":
+          description: Upcoming alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UpcomingAlert"
+
+  # ──────────────────────────────────────────────────────
+  # CONTRACTS
+  # ──────────────────────────────────────────────────────
+  /contracts:
+    get:
+      operationId: listContracts
+      tags: [contracts]
+      summary: List user contracts
+      parameters:
+        - name: contractType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of contracts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContractSummary"
+
+  /contracts/upload:
+    post:
+      operationId: uploadContract
+      tags: [contracts]
+      summary: Upload a contract file or paste text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContractUploadInput"
+      responses:
+        "201":
+          description: Contract uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+  /contracts/{contractId}:
+    get:
+      operationId: getContract
+      tags: [contracts]
+      summary: Get a single contract with full analysis
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contract details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateContract
+      tags: [contracts]
+      summary: Update contract metadata
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContractUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+    delete:
+      operationId: deleteContract
+      tags: [contracts]
+      summary: Delete a contract permanently
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /contracts/{contractId}/analyze:
+    post:
+      operationId: analyzeContract
+      tags: [contracts]
+      summary: Start AI analysis of an uploaded contract
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisOptions"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
+  /contracts/{contractId}/export/{format}:
+    get:
+      operationId: exportContract
+      tags: [contracts]
+      summary: Export contract report (PDF or CSV)
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [pdf, csv]
+      responses:
+        "200":
+          description: Export file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /contracts/compare:
+    post:
+      operationId: compareContracts
+      tags: [contracts]
+      summary: Compare two contracts side by side
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareInput"
+      responses:
+        "200":
+          description: Comparison result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonResult"
+
+  # ──────────────────────────────────────────────────────
+  # CLAUSES
+  # ──────────────────────────────────────────────────────
+  /contracts/{contractId}/clauses:
+    get:
+      operationId: listClauses
+      tags: [clauses]
+      summary: List clauses for a contract
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Clauses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Clause"
+
+  # ──────────────────────────────────────────────────────
+  # ASK DALEEL (Q&A)
+  # ──────────────────────────────────────────────────────
+  /contracts/{contractId}/questions:
+    get:
+      operationId: listQuestions
+      tags: [questions]
+      summary: List Q&A history for a contract
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Questions and answers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+
+    post:
+      operationId: askQuestion
+      tags: [questions]
+      summary: Ask Daleel a question about a contract
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  # ──────────────────────────────────────────────────────
+  # REMINDERS
+  # ──────────────────────────────────────────────────────
+  /reminders:
+    get:
+      operationId: listReminders
+      tags: [reminders]
+      summary: List user reminders
+      responses:
+        "200":
+          description: Reminders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reminder"
+
+    post:
+      operationId: createReminder
+      tags: [reminders]
+      summary: Create a reminder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReminderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+
+  /reminders/{reminderId}:
+    patch:
+      operationId: updateReminder
+      tags: [reminders]
+      summary: Update or complete a reminder
+      parameters:
+        - name: reminderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReminderUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reminder"
+
+    delete:
+      operationId: deleteReminder
+      tags: [reminders]
+      summary: Delete a reminder
+      parameters:
+        - name: reminderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ──────────────────────────────────────────────────────
+  # ADMIN
+  # ──────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get system-wide usage stats
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List all users
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserAdmin"
+
+  /admin/users/{userId}:
+    patch:
+      operationId: updateAdminUser
+      tags: [admin]
+      summary: Update user role or status
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserAdminUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAdmin"
+
+  /admin/logs:
+    get:
+      operationId: getActivityLogs
+      tags: [admin]
+      summary: Get system activity logs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityLog"
+
+# ──────────────────────────────────────────────────────
+# SCHEMAS
+# ──────────────────────────────────────────────────────
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    # ── AUTH ──
+    RegisterInput:
+      type: object
+      required: [fullName, email, password]
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        preferredLanguage:
+          type: string
+          enum: [ar, en]
+          default: ar
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, fullName, email, role, preferredLanguage, createdAt]
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        preferredLanguage:
+          type: string
+          enum: [ar, en]
+        createdAt:
+          type: string
+          format: date-time
+
+    UserSettingsInput:
+      type: object
+      properties:
+        fullName:
+          type: string
+        preferredLanguage:
+          type: string
+          enum: [ar, en]
+
+    # ── DASHBOARD ──
+    DashboardSummary:
+      type: object
+      required: [totalContracts, highRiskCount, upcomingRenewals, recentContracts, contractsByType]
+      properties:
+        totalContracts:
+          type: integer
+        highRiskCount:
+          type: integer
+        upcomingRenewals:
+          type: integer
+        upcomingCancellations:
+          type: integer
+        recentContracts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractSummary"
+        contractsByType:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractTypeCount"
+
+    ContractTypeCount:
+      type: object
+      required: [contractType, count]
+      properties:
+        contractType:
+          type: string
+        count:
+          type: integer
+
+    UpcomingAlert:
+      type: object
+      required: [contractId, contractTitle, alertType, daysUntil, date]
+      properties:
+        contractId:
+          type: integer
+        contractTitle:
+          type: string
+        alertType:
+          type: string
+          enum: [renewal, cancellation_deadline, payment, trial_end, expiry]
+        daysUntil:
+          type: integer
+        date:
+          type: string
+          format: date
+
+    # ── CONTRACT ──
+    ContractUploadInput:
+      type: object
+      properties:
+        pastedText:
+          type: string
+        fileBase64:
+          type: string
+        fileName:
+          type: string
+        fileType:
+          type: string
+        contractType:
+          type: string
+        language:
+          type: string
+          enum: [ar, en, mixed]
+        title:
+          type: string
+
+    ContractUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        contractType:
+          type: string
+
+    AnalysisOptions:
+      type: object
+      properties:
+        explanationLevel:
+          type: string
+          enum: [simple, standard, detailed]
+          default: standard
+        outputLanguage:
+          type: string
+          enum: [ar, en]
+          default: ar
+
+    ContractSummary:
+      type: object
+      required: [id, title, contractType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        contractType:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, analyzed, failed]
+        clarityScore:
+          type: ["integer", "null"]
+        highRiskCount:
+          type: integer
+        automaticRenewal:
+          type: ["boolean", "null"]
+        endDate:
+          type: ["string", "null"]
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+
+    Contract:
+      type: object
+      required: [id, title, contractType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        contractType:
+          type: string
+        originalFileName:
+          type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+        extractedText:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, processing, analyzed, failed]
+        clarityScore:
+          type: ["integer", "null"]
+        clarityExplanation:
+          type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
+        summary:
+          type: ["string", "null"]
+        parties:
+          type: array
+          items:
+            $ref: "#/components/schemas/Party"
+        startDate:
+          type: ["string", "null"]
+          format: date
+        endDate:
+          type: ["string", "null"]
+          format: date
+        duration:
+          type: ["string", "null"]
+        totalCost:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        monthlyPayment:
+          type: ["number", "null"]
+        annualPayment:
+          type: ["number", "null"]
+        deposit:
+          type: ["number", "null"]
+        automaticRenewal:
+          type: ["boolean", "null"]
+        renewalNoticeDays:
+          type: ["integer", "null"]
+        cancellationAllowed:
+          type: ["boolean", "null"]
+        cancellationNoticeDays:
+          type: ["integer", "null"]
+        earlyCancellationPenalty:
+          type: ["number", "null"]
+        refundPolicy:
+          type: ["string", "null"]
+        trialPeriodDays:
+          type: ["integer", "null"]
+        clauses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Clause"
+        financialDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/FinancialDetail"
+        contractDates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractDate"
+        suggestedQuestions:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Party:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+
+    Clause:
+      type: object
+      required: [id, category, title, simpleExplanation, riskLevel]
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+        title:
+          type: string
+        simpleExplanation:
+          type: string
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+        sourcePage:
+          type: ["integer", "null"]
+        sourceText:
+          type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
+
+    FinancialDetail:
+      type: object
+      required: [id, type, amount, currency]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        description:
+          type: ["string", "null"]
+        sourcePage:
+          type: ["integer", "null"]
+        sourceText:
+          type: ["string", "null"]
+
+    ContractDate:
+      type: object
+      required: [id, type, date]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        date:
+          type: string
+          format: date
+        description:
+          type: ["string", "null"]
+        sourcePage:
+          type: ["integer", "null"]
+
+    CompareInput:
+      type: object
+      required: [contractIdA, contractIdB]
+      properties:
+        contractIdA:
+          type: integer
+        contractIdB:
+          type: integer
+
+    ComparisonResult:
+      type: object
+      required: [contractA, contractB, aiSummary, differences]
+      properties:
+        contractA:
+          $ref: "#/components/schemas/ContractSummary"
+        contractB:
+          $ref: "#/components/schemas/ContractSummary"
+        aiSummary:
+          type: string
+        differences:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonDifference"
+
+    ComparisonDifference:
+      type: object
+      required: [field, labelAr, labelEn, valueA, valueB, advantage]
+      properties:
+        field:
+          type: string
+        labelAr:
+          type: string
+        labelEn:
+          type: string
+        valueA:
+          type: string
+        valueB:
+          type: string
+        advantage:
+          type: string
+          enum: [a, b, neutral]
+
+    # ── Q&A ──
+    QuestionInput:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+
+    Question:
+      type: object
+      required: [id, contractId, question, answer, createdAt]
+      properties:
+        id:
+          type: integer
+        contractId:
+          type: integer
+        question:
+          type: string
+        answer:
+          type: string
+        sourcePage:
+          type: ["integer", "null"]
+        sourceText:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── REMINDERS ──
+    ReminderInput:
+      type: object
+      required: [contractId, title, reminderDate, type]
+      properties:
+        contractId:
+          type: integer
+        title:
+          type: string
+        reminderDate:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [expiry, renewal, cancellation, payment, trial_end, warranty]
+
+    ReminderUpdate:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        reminderDate:
+          type: string
+          format: date
+        title:
+          type: string
+
+    Reminder:
+      type: object
+      required: [id, contractId, title, reminderDate, type, completed, createdAt]
+      properties:
+        id:
+          type: integer
+        contractId:
+          type: integer
+        contractTitle:
+          type: string
+        title:
+          type: string
+        reminderDate:
+          type: string
+          format: date
+        type:
+          type: string
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── ADMIN ──
+    AdminStats:
+      type: object
+      required: [totalUsers, totalContracts, totalAnalyses, failedAnalyses, contractsByType]
+      properties:
+        totalUsers:
+          type: integer
+        totalContracts:
+          type: integer
+        totalAnalyses:
+          type: integer
+        failedAnalyses:
+          type: integer
+        contractsByType:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractTypeCount"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityLog"
+
+    UserAdmin:
+      type: object
+      required: [id, fullName, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        preferredLanguage:
+          type: string
+        contractCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    UserAdminUpdate:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+
+    ActivityLog:
+      type: object
+      required: [id, action, entityType, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        userEmail:
+          type: ["string", "null"]
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time

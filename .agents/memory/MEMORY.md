@@ -1,0 +1,1 @@
+- [Daleel Project Overview](daleel-overview.md) — full-stack bilingual Arabic/English AI contract analysis SaaS; stack, auth, AI, and seed details.

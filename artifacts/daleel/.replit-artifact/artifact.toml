@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Daleel | دليل"
+version = "1.0.0"
+id = "artifacts/daleel"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26027
+
+[services.development]
+run = "pnpm --filter @workspace/daleel run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/daleel", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/daleel/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26027"
+BASE_PATH = "/"
