@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useTranslation } from "@/lib/i18n";
-import { useGetContract, useListQuestions, useAskQuestion } from "@workspace/api-client-react";
+import {
+  getGetContractQueryKey,
+  getListQuestionsQueryKey,
+  useAskQuestion,
+  useGetContract,
+  useListQuestions,
+} from "@workspace/api-client-react";
 import { 
   Send, ArrowLeft, ArrowRight, Bot, User as UserIcon, Loader2
 } from "lucide-react";
@@ -19,9 +25,13 @@ export default function AskDaleel() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: contract } = useGetContract(id, { query: { enabled: !!id } });
-  const { data: pastQuestions, refetch } = useListQuestions(id, { query: { enabled: !!id } });
-  const askMutation = useAskQuestion(id);
+  const { data: contract } = useGetContract(id, {
+    query: { enabled: !!id, queryKey: getGetContractQueryKey(id) },
+  });
+  const { data: pastQuestions, refetch } = useListQuestions(id, {
+    query: { enabled: !!id, queryKey: getListQuestionsQueryKey(id) },
+  });
+  const askMutation = useAskQuestion();
 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string, sourcePage?: number | null }[]>([]);

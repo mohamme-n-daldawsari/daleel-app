@@ -31,7 +31,13 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={toggleLanguage} className="rounded-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleLanguage}
+              className="rounded-full"
+              aria-label={language === "ar" ? "Switch to English" : "التبديل إلى العربية"}
+            >
               <Globe className="w-5 h-5 text-slate-600" />
             </Button>
             <div className="hidden sm:flex items-center gap-3">
@@ -80,21 +86,16 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Demo Credentials */}
+            {/* Authentication guidance */}
             <div className="mt-16 mx-auto max-w-md p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left rtl:text-right">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                {language === 'ar' ? 'حسابات تجريبية' : 'Demo Credentials'}
+                {language === 'ar' ? 'دخول آمن' : 'Secure authentication'}
               </p>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center bg-white dark:bg-slate-950 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                  <div className="text-sm"><span className="text-slate-400">User:</span> <span className="font-mono text-slate-700 dark:text-slate-300">user@daleel.app</span></div>
-                  <div className="text-sm"><span className="text-slate-400">Pass:</span> <span className="font-mono text-slate-700 dark:text-slate-300">demo1234</span></div>
-                </div>
-                <div className="flex justify-between items-center bg-white dark:bg-slate-950 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                  <div className="text-sm"><span className="text-slate-400">Admin:</span> <span className="font-mono text-slate-700 dark:text-slate-300">admin@daleel.app</span></div>
-                  <div className="text-sm"><span className="text-slate-400">Pass:</span> <span className="font-mono text-slate-700 dark:text-slate-300">admin1234</span></div>
-                </div>
-              </div>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                {language === 'ar'
+                  ? 'أنشئ حساب اختبار من صفحة التسجيل بعد إعداد Clerk محلياً.'
+                  : 'Create a test account from Sign Up after configuring Clerk locally.'}
+              </p>
             </div>
           </div>
         </section>

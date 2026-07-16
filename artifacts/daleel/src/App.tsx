@@ -25,11 +25,12 @@ import About from '@/pages/about';
 import AdminDashboard from '@/pages/admin-dashboard';
 import AdminUsers from '@/pages/admin-users';
 import AdminLogs from '@/pages/admin-logs';
+import { useGetMe } from '@workspace/api-client-react';
 
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
+const configuredClerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const clerkPubKey = configuredClerkPubKey
+  ? publishableKeyFromHost(window.location.hostname, configuredClerkPubKey)
+  : null;
 
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
@@ -41,7 +42,7 @@ function stripBase(path: string): string {
     : path;
 }
 
-if (!clerkPubKey) {
+if (!clerkPubKey && !import.meta.env.DEV) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
 }
 
@@ -154,7 +155,7 @@ function ClerkProviderWithRoutes() {
 
   return (
     <ClerkProvider
-      publishableKey={clerkPubKey}
+      publishableKey={clerkPubKey!}
       proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       localization={{
@@ -187,9 +188,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/reminders"><ProtectedRoute component={Reminders} /></Route>
           <Route path="/settings"><ProtectedRoute component={Settings} /></Route>
           
-          <Route path="/admin"><ProtectedRoute component={AdminDashboard} /></Route>
-          <Route path="/admin/users"><ProtectedRoute component={AdminUsers} /></Route>
-          <Route path="/admin/logs"><ProtectedRoute component={AdminLogs} /></Route>
+          <Route path="/admin"><AdminRoute component={AdminDashboard} /></Route>
+          <Route path="/admin/users"><AdminRoute component={AdminUsers} /></Route>
+          <Route path="/admin/logs"><AdminRoute component={AdminLogs} /></Route>
 
           <Route component={NotFound} />
         </Switch>
@@ -198,12 +199,93 @@ function ClerkProviderWithRoutes() {
   );
 }
 
+function SignedInAdminRoute({ component: Component }: { component: React.ComponentType<any> }) {
+  const { data: user, isLoading } = useGetMe();
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <div className="flex min-h-64 items-center justify-center text-slate-500">
+          Loading...
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user?.role !== 'admin') {
+    return <Redirect to="/dashboard" />;
+  }
+
+  return (
+    <AppShell>
+      <Component />
+    </AppShell>
+  );
+}
+
+function AdminRoute({ component: Component }: { component: React.ComponentType<any> }) {
+  return (
+    <>
+      <Show when="signed-in">
+        <SignedInAdminRoute component={Component} />
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-in" />
+      </Show>
+    </>
+  );
+}
+
+function ClerkSetupRequired() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div className="max-w-lg rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm dark:border-amber-900/50 dark:bg-slate-900">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          Authentication setup required
+        </h1>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">
+          Add VITE_CLERK_PUBLISHABLE_KEY to the local environment, then restart
+          the development server to use sign-in and protected pages.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function DevelopmentRoutesWithoutClerk() {
+  return (
+    <Switch>
+      <Route path="/" component={LandingPage} />
+      <Route path="/about" component={About} />
+      <Route path="/sign-in/*?" component={ClerkSetupRequired} />
+      <Route path="/sign-up/*?" component={ClerkSetupRequired} />
+      <Route path="/dashboard" component={ClerkSetupRequired} />
+      <Route path="/contracts/upload" component={ClerkSetupRequired} />
+      <Route path="/contracts/compare" component={ClerkSetupRequired} />
+      <Route path="/contracts/processing/:id" component={ClerkSetupRequired} />
+      <Route path="/contracts/:id/ask" component={ClerkSetupRequired} />
+      <Route path="/contracts/:id" component={ClerkSetupRequired} />
+      <Route path="/contracts" component={ClerkSetupRequired} />
+      <Route path="/reminders" component={ClerkSetupRequired} />
+      <Route path="/settings" component={ClerkSetupRequired} />
+      <Route path="/admin" component={ClerkSetupRequired} />
+      <Route path="/admin/users" component={ClerkSetupRequired} />
+      <Route path="/admin/logs" component={ClerkSetupRequired} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
 function App() {
   return (
     <AppProvider>
       <TooltipProvider>
         <WouterRouter base={basePath}>
-          <ClerkProviderWithRoutes />
+          {clerkPubKey ? (
+            <ClerkProviderWithRoutes />
+          ) : (
+            <DevelopmentRoutesWithoutClerk />
+          )}
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

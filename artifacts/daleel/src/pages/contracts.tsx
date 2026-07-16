@@ -168,7 +168,7 @@ export default function ContractsList() {
                       <StatusBadge status={contract.status} t={t} />
                     </td>
                     <td className="px-6 py-4">
-                      {contract.highRiskCount > 0 ? (
+                      {(contract.highRiskCount ?? 0) > 0 ? (
                         <div className="flex items-center gap-1.5 text-red-600 font-medium">
                           <ShieldAlert className="w-4 h-4" />
                           <span>{contract.highRiskCount}</span>

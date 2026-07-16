@@ -782,6 +782,10 @@ components:
           type: string
           enum: [ar, en]
           default: ar
+        force:
+          type: boolean
+          default: false
+          description: Explicitly replace a completed analysis; this can consume API credit.
 
     ContractSummary:
       type: object

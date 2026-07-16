@@ -1,12 +1,19 @@
 import React from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useTranslation } from "@/lib/i18n";
-import { useGetContract, useDeleteContract, useExportContract } from "@workspace/api-client-react";
+import {
+  getExportContractQueryKey,
+  getGetContractQueryKey,
+  useAnalyzeContract,
+  useDeleteContract,
+  useExportContract,
+  useGetContract,
+} from "@workspace/api-client-react";
 import { 
   FileText, Download, Trash2, ArrowLeft, ArrowRight, MessageSquare,
   AlertTriangle, Calendar, DollarSign, XOctagon, CheckCircle2,
   Shield, FileQuestion,
-  RefreshCcw
+  RefreshCcw, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +32,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format, parseISO } from "date-fns";
 import { ar, enUS } from "date-fns/locale";
+import { queryClient } from "@/lib/queryClient";
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!error || typeof error !== "object") return fallback;
+  const data = (error as { data?: unknown }).data;
+  if (data && typeof data === "object") {
+    const message = (data as { error?: unknown }).error;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
 
 export default function ContractReport() {
   const params = useParams();
@@ -37,11 +55,20 @@ export default function ContractReport() {
   const BackIcon = isRtl ? ArrowRight : ArrowLeft;
   const dateLocale = isRtl ? ar : enUS;
 
-  const { data: contract, isLoading } = useGetContract(id, { query: { enabled: !!id } });
+  const { data: contract, isLoading } = useGetContract(id, {
+    query: { enabled: !!id, queryKey: getGetContractQueryKey(id) },
+  });
   const deleteMutation = useDeleteContract();
+  const analyzeMutation = useAnalyzeContract();
   
   // Note: we fetch on demand when Export is clicked
-  const exportMutation = useExportContract(id, 'pdf', { query: { enabled: false } });
+  const exportMutation = useExportContract(id, 'pdf', {
+    query: {
+      enabled: false,
+      queryKey: getExportContractQueryKey(id, 'pdf'),
+    },
+    request: { responseType: 'blob' },
+  });
 
   const handleDelete = () => {
     deleteMutation.mutate({ contractId: id }, {
@@ -54,19 +81,59 @@ export default function ContractReport() {
 
   const handleExport = () => {
     exportMutation.refetch().then((res) => {
-      // Assuming res.data is a blob or URL, standard behavior for file export APIs. 
-      // If it returns a URL:
-      if (res.data && typeof res.data === 'string') {
-        window.open(res.data, '_blank');
-      } else if (res.data) {
-        // Blob handling fallback
-        const url = window.URL.createObjectURL(new Blob([res.data as any]));
+      if (res.data) {
+        const url = window.URL.createObjectURL(res.data);
         const a = document.createElement('a');
         a.href = url;
         a.download = `contract-${id}.pdf`;
+        document.body.appendChild(a);
         a.click();
+        a.remove();
+        window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
       }
+    }).catch(() => {
+      toast({
+        title: language === 'ar' ? 'فشل تصدير التقرير' : 'Report export failed',
+        variant: 'destructive',
+      });
     });
+  };
+
+  const handleReanalyze = () => {
+    analyzeMutation.mutate(
+      {
+        contractId: id,
+        data: {
+          explanationLevel: "standard",
+          outputLanguage: "ar",
+          force: true,
+        },
+      },
+      {
+        onSuccess: (updatedContract) => {
+          queryClient.setQueryData(getGetContractQueryKey(id), updatedContract);
+          toast({
+            title: language === "ar" ? "اكتملت إعادة التحليل" : "Re-analysis complete",
+            description:
+              language === "ar"
+                ? "تم استبدال التحليل السابق وحفظ النتيجة الجديدة."
+                : "The previous analysis was replaced and the new result was saved.",
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: language === "ar" ? "فشلت إعادة التحليل" : "Re-analysis failed",
+            description: getApiErrorMessage(
+              error,
+              language === "ar"
+                ? "تعذر الاتصال بخدمة OpenAI. بقي التحليل السابق محفوظاً ولم تُستخدم نتيجة تجريبية."
+                : "OpenAI could not complete the request. The previous analysis remains saved and no demo result was used.",
+            ),
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   if (isLoading) {
@@ -83,6 +150,17 @@ export default function ContractReport() {
 
   if (!contract) return <div>Not found</div>;
 
+  const cancellationClauses =
+    contract.clauses?.filter((clause) =>
+      ["cancellation", "renewal"].includes(clause.category),
+    ) ?? [];
+  const rightsAndDuties =
+    contract.clauses?.filter((clause) =>
+      ["right", "obligation", "missing_clause", "recommendation"].includes(
+        clause.category,
+      ),
+    ) ?? [];
+
   const scoreColor = contract.clarityScore && contract.clarityScore >= 80 ? 'text-emerald-500' 
                    : contract.clarityScore && contract.clarityScore >= 50 ? 'text-amber-500' 
                    : 'text-red-500';
@@ -92,7 +170,13 @@ export default function ContractReport() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()} className="rounded-full bg-slate-100 dark:bg-slate-900">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Back to contracts"
+            onClick={() => window.history.back()}
+            className="rounded-full bg-slate-100 dark:bg-slate-900"
+          >
             <BackIcon className="w-5 h-5" />
           </Button>
           <div>
@@ -109,7 +193,44 @@ export default function ContractReport() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={analyzeMutation.isPending}
+                className="rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+              >
+                {analyzeMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0 animate-spin" />
+                ) : (
+                  <RefreshCcw className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
+                )}
+                {language === "ar" ? "إعادة التحليل" : "Re-analyze"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {language === "ar" ? "إعادة تحليل العقد؟" : "Re-analyze this contract?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {language === "ar"
+                    ? "سيؤدي هذا إلى إرسال نص العقد إلى OpenAI، واستهلاك رصيد API، واستبدال التحليل الحالي عند نجاح الطلب. لا يلزم إعادة التحليل لعرض النتيجة المحفوظة."
+                    : "This sends the contract text to OpenAI, consumes API credit, and replaces the current analysis if successful. Re-analysis is not required to view the saved result."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleReanalyze}
+                  className="bg-amber-600 text-white hover:bg-amber-700"
+                >
+                  {language === "ar" ? "تأكيد واستهلاك الرصيد" : "Confirm and use credit"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Link href={`/contracts/${id}/ask`} className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 shadow-sm whitespace-nowrap">
             <MessageSquare className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
             {language === 'ar' ? 'اسأل دليل' : 'Ask Daleel'}
@@ -121,7 +242,12 @@ export default function ContractReport() {
           
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-xl text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Delete contract"
+                className="rounded-xl text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20"
+              >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </AlertDialogTrigger>
@@ -141,6 +267,16 @@ export default function ContractReport() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+      </div>
+
+      <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+        <p>
+          <strong>{language === "ar" ? "تنبيه قانوني: " : "Legal notice: "}</strong>
+          {language === "ar"
+            ? "هذا التحليل معلوماتي للمساعدة على فهم العقد، ولا يُعد بديلاً عن استشارة محامٍ مرخص. راجع محامياً مختصاً قبل اتخاذ قرار قانوني أو مالي مهم."
+            : "This analysis is informational and helps explain the contract. It is not a substitute for advice from a licensed lawyer. Consult qualified counsel before making important legal or financial decisions."}
+        </p>
       </div>
 
       {/* Main Stats Row */}
@@ -328,17 +464,68 @@ export default function ContractReport() {
             </div>
           </TabsContent>
           
-          <TabsContent value="dates" className="m-0 p-6 md:p-8 outline-none text-center text-slate-500">
-             {/* Simple placeholder for other tabs to save space in the prompt */}
-             {language === 'ar' ? 'التواريخ قريباً...' : 'Dates details...'}
+          <TabsContent value="dates" className="m-0 p-6 md:p-8 outline-none">
+            <h3 className="text-xl font-bold mb-6">
+              {language === "ar" ? "التواريخ والمواعيد المهمة" : "Important dates and deadlines"}
+            </h3>
+            {contract.contractDates?.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {contract.contractDates.map((contractDate) => (
+                  <div key={contractDate.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="font-semibold text-slate-900 dark:text-white">{contractDate.type}</span>
+                      <time className="font-mono text-sm text-teal-700 dark:text-teal-300">{contractDate.date}</time>
+                    </div>
+                    {contractDate.description && <p className="text-sm text-slate-600 dark:text-slate-400">{contractDate.description}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500">{language === "ar" ? "لم تُستخرج تواريخ مؤكدة من العقد." : "No confirmed dates were extracted."}</p>
+            )}
           </TabsContent>
           
-          <TabsContent value="cancellation" className="m-0 p-6 md:p-8 outline-none text-center text-slate-500">
-             {language === 'ar' ? 'شروط الإلغاء...' : 'Cancellation terms...'}
+          <TabsContent value="cancellation" className="m-0 p-6 md:p-8 outline-none">
+            <h3 className="text-xl font-bold mb-6">
+              {language === "ar" ? "الإلغاء والتجديد" : "Cancellation and renewal"}
+            </h3>
+            <div className="mb-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/60">
+                <div className="text-sm text-slate-500">{language === "ar" ? "مهلة إشعار الإلغاء" : "Cancellation notice"}</div>
+                <div className="mt-1 font-bold">{contract.cancellationNoticeDays == null ? "—" : `${contract.cancellationNoticeDays} ${language === "ar" ? "يوماً" : "days"}`}</div>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900/60">
+                <div className="text-sm text-slate-500">{language === "ar" ? "غرامة الإلغاء المبكر" : "Early cancellation penalty"}</div>
+                <div className="mt-1 font-bold">{contract.earlyCancellationPenalty == null ? "—" : `${contract.earlyCancellationPenalty.toLocaleString()} ${contract.currency ?? ""}`}</div>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {cancellationClauses.length ? cancellationClauses.map((clause) => (
+                <div key={clause.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                  <h4 className="font-bold">{clause.title}</h4>
+                  <p className="mt-2 text-slate-600 dark:text-slate-300">{clause.simpleExplanation}</p>
+                  {clause.sourceText && <blockquote className="mt-3 border-s-2 border-slate-300 ps-3 text-sm italic text-slate-500">{clause.sourceText}</blockquote>}
+                </div>
+              )) : <p className="text-slate-500">{language === "ar" ? "لم تُستخرج شروط إلغاء أو تجديد واضحة." : "No clear cancellation or renewal terms were extracted."}</p>}
+            </div>
           </TabsContent>
           
-          <TabsContent value="rights" className="m-0 p-6 md:p-8 outline-none text-center text-slate-500">
-             {language === 'ar' ? 'الحقوق والواجبات...' : 'Rights & Duties...'}
+          <TabsContent value="rights" className="m-0 p-6 md:p-8 outline-none">
+            <h3 className="text-xl font-bold mb-6">
+              {language === "ar" ? "الحقوق والالتزامات والنواقص والتوصيات" : "Rights, obligations, gaps, and recommendations"}
+            </h3>
+            <div className="space-y-4">
+              {rightsAndDuties.length ? rightsAndDuties.map((clause) => (
+                <div key={clause.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-bold">{clause.title}</h4>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium dark:bg-slate-800">{clause.category}</span>
+                  </div>
+                  <p className="mt-2 text-slate-600 dark:text-slate-300">{clause.simpleExplanation}</p>
+                  {clause.sourceText && <blockquote className="mt-3 border-s-2 border-slate-300 ps-3 text-sm italic text-slate-500">{clause.sourceText}</blockquote>}
+                </div>
+              )) : <p className="text-slate-500">{language === "ar" ? "لم تُستخرج عناصر إضافية في هذه الفئات." : "No additional items were extracted for these categories."}</p>}
+            </div>
           </TabsContent>
 
         </div>

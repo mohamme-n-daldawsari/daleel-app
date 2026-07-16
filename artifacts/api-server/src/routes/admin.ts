@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, desc, count, or } from "drizzle-orm";
+import { and, eq, ilike, desc, count, or } from "drizzle-orm";
 import { db, usersTable, contractsTable, activityLogsTable } from "@workspace/db";
 import { requireAdmin } from "../lib/authMiddleware";
 
@@ -58,7 +58,7 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
   const users = await db
     .select()
     .from(usersTable)
-    .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : conditions[0]) : undefined)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(usersTable.createdAt));
 
   // Get contract count per user

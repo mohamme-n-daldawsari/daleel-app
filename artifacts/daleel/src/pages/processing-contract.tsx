@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useTranslation } from "@/lib/i18n";
-import { useGetContract, getGetContractQueryKey } from "@workspace/api-client-react";
+import { useAnalyzeContract, useGetContract, getGetContractQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/queryClient";
 import { 
   FileText, Search, Fingerprint, Calculator, 
@@ -17,10 +17,14 @@ export default function ProcessingContract() {
   const { language } = useTranslation();
 
   const [activeStep, setActiveStep] = useState(0);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const analysisRequested = useRef(false);
+  const analyzeMutation = useAnalyzeContract();
 
   // Poll every 2 seconds if status is processing or pending
   const { data: contract, error } = useGetContract(id, { 
     query: { 
+      queryKey: getGetContractQueryKey(id),
       refetchInterval: (query) => {
         const state = query.state.data;
         if (state && (state.status === 'analyzed' || state.status === 'failed')) {
@@ -42,27 +46,71 @@ export default function ProcessingContract() {
   ];
 
   useEffect(() => {
-    if (contract) {
-      if (contract.status === 'analyzed') {
-        setActiveStep(steps.length);
-        // Small delay so user sees completion
-        setTimeout(() => setLocation(`/contracts/${id}`), 1500);
-      } else if (contract.status === 'failed') {
-        // failed state handled in UI
-      } else {
-        // Fake progression animation for processing state
-        const timer = setInterval(() => {
-          setActiveStep((prev) => {
-            if (prev < steps.length - 1) return prev + 1;
-            return prev;
-          });
-        }, 1500);
-        return () => clearInterval(timer);
-      }
+    if (contract?.status !== "pending" || analysisRequested.current) {
+      return;
     }
+
+    analysisRequested.current = true;
+    analyzeMutation.mutate(
+      {
+        contractId: id,
+        data: {
+          explanationLevel: "standard",
+          outputLanguage: language,
+        },
+      },
+      {
+        onSuccess: (analyzedContract) => {
+          queryClient.setQueryData(
+            getGetContractQueryKey(id),
+            analyzedContract,
+          );
+        },
+        onError: (error) => {
+          const data = error && typeof error === "object"
+            ? (error as { data?: unknown }).data
+            : null;
+          const apiMessage = data && typeof data === "object"
+            ? (data as { error?: unknown }).error
+            : null;
+          setAnalysisError(
+            typeof apiMessage === "string"
+              ? apiMessage
+              : language === "ar"
+                ? "تعذر إكمال التحليل بواسطة OpenAI. لم يتم استخدام نتيجة تجريبية."
+                : "OpenAI could not complete the analysis. No demo result was used.",
+          );
+          queryClient.invalidateQueries({
+            queryKey: getGetContractQueryKey(id),
+          });
+        },
+      },
+    );
+  }, [analyzeMutation, contract?.status, id, language]);
+
+  useEffect(() => {
+    if (!contract || contract.status === 'failed') {
+      return undefined;
+    }
+
+    if (contract.status === 'analyzed') {
+      setActiveStep(steps.length);
+      // Small delay so user sees completion
+      const timeout = setTimeout(() => setLocation(`/contracts/${id}`), 1500);
+      return () => clearTimeout(timeout);
+    }
+
+    // Fake progression animation for processing state
+    const timer = setInterval(() => {
+      setActiveStep((prev) => {
+        if (prev < steps.length - 1) return prev + 1;
+        return prev;
+      });
+    }, 1500);
+    return () => clearInterval(timer);
   }, [contract, id, setLocation]);
 
-  if (error || contract?.status === 'failed') {
+  if (error || analyzeMutation.isError || contract?.status === 'failed') {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4 animate-in fade-in zoom-in-95 duration-500">
         <div className="w-24 h-24 bg-red-100 text-red-600 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
@@ -72,9 +120,9 @@ export default function ProcessingContract() {
           {language === 'ar' ? 'فشل تحليل العقد' : 'Analysis Failed'}
         </h1>
         <p className="text-slate-500 max-w-md mb-8">
-          {language === 'ar' 
+          {analysisError ?? (language === 'ar'
             ? 'حدث خطأ أثناء محاولة الذكاء الاصطناعي قراءة المستند. قد يكون الملف غير واضح أو غير مدعوم.' 
-            : 'An error occurred while the AI was trying to read the document. The file might be unclear or unsupported.'}
+            : 'An error occurred while the AI was trying to read the document. The file might be unclear or unsupported.')}
         </p>
         <div className="flex gap-4">
           <Button onClick={() => setLocation('/contracts/upload')} className="bg-slate-900 dark:bg-white dark:text-slate-900">

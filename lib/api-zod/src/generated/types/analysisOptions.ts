@@ -11,4 +11,6 @@ import type { AnalysisOptionsOutputLanguage } from './analysisOptionsOutputLangu
 export interface AnalysisOptions {
   explanationLevel?: AnalysisOptionsExplanationLevel;
   outputLanguage?: AnalysisOptionsOutputLanguage;
+  /** Explicitly replace a completed analysis; this can consume API credit. */
+  force?: boolean;
 }

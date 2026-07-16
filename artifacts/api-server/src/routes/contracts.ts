@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, ilike, desc, count } from "drizzle-orm";
+import { eq, and, ilike, desc, count, inArray } from "drizzle-orm";
 import {
   db,
   contractsTable,
@@ -9,10 +9,15 @@ import {
   contractDatesTable,
 } from "@workspace/db";
 import { requireAuth, logActivity } from "../lib/authMiddleware";
-import { analyzeContract } from "../lib/aiService";
+import {
+  analyzeContract,
+  ContractAnalysisError,
+  MAX_CONTRACT_TEXT_LENGTH,
+} from "../lib/aiService";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 // Helper to build full contract response
 async function buildContractResponse(contractId: number) {
@@ -41,8 +46,6 @@ async function buildContractResponse(contractId: number) {
 router.get("/contracts", requireAuth, async (req, res): Promise<void> => {
   const userId = req.dbUser!.id;
   const { contractType, status, search } = req.query as Record<string, string | undefined>;
-
-  let query = db.select().from(contractsTable).where(eq(contractsTable.userId, userId)).$dynamic();
 
   const conditions = [eq(contractsTable.userId, userId)];
   if (contractType) conditions.push(eq(contractsTable.contractType, contractType));
@@ -77,7 +80,6 @@ router.get("/contracts", requireAuth, async (req, res): Promise<void> => {
       createdAt: c.createdAt,
     })),
   );
-  void query;
 });
 
 // POST /contracts/upload
@@ -95,28 +97,69 @@ router.post("/contracts/upload", requireAuth, async (req, res): Promise<void> =>
 
   let extractedText = pastedText ?? "";
 
+  if (extractedText.length > MAX_CONTRACT_TEXT_LENGTH) {
+    res.status(413).json({
+      error: `نص العقد كبير جداً. الحد الأقصى للتحليل هو ${MAX_CONTRACT_TEXT_LENGTH.toLocaleString("ar-SA")} حرف.`,
+    });
+    return;
+  }
+
   // If file was provided, decode base64 and extract text
   if (fileBase64 && fileName) {
+    const estimatedFileSize = Math.floor((fileBase64.length * 3) / 4);
+    if (estimatedFileSize > MAX_FILE_SIZE_BYTES) {
+      res.status(413).json({ error: "حجم الملف كبير جداً. الحد الأقصى المسموح به هو 10 ميجابايت." });
+      return;
+    }
+
     try {
       const buffer = Buffer.from(fileBase64, "base64");
       if (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
-        // Try PDF text extraction
         try {
-          const pdfParse = await import("pdf-parse");
-          const pdfData = await pdfParse.default(buffer);
-          extractedText = pdfData.text || "";
-        } catch {
-          // If pdf-parse fails, use placeholder text for demo
-          extractedText = `[PDF file: ${fileName}]\n\nUnable to extract text from this PDF. Using demo analysis mode.`;
+          const { PDFParse } = await import("pdf-parse");
+          const parser = new PDFParse({ data: buffer });
+          try {
+            const pdfData = await parser.getText();
+            extractedText = pdfData.text || "";
+          } finally {
+            await parser.destroy();
+          }
+        } catch (error) {
+          req.log.warn(
+            { errorName: error instanceof Error ? error.name : "UnknownError" },
+            "PDF text extraction failed",
+          );
+          res.status(422).json({
+            error: "تعذر استخراج نص من ملف PDF. تأكد أن الملف يحتوي على نص قابل للقراءة وليس صورة ممسوحة ضوئياً.",
+          });
+          return;
         }
       } else {
-        // Image files — use placeholder for now (OCR would require external service)
-        extractedText = `[Image file: ${fileName}]\n\nImage text extraction is not available in this version. Using demo analysis mode.`;
+        res.status(415).json({
+          error: "تحليل الصور غير متاح حالياً لأن استخراج النص OCR غير مفعّل. ارفع ملف PDF نصياً أو الصق نص العقد.",
+        });
+        return;
       }
-    } catch (err) {
-      req.log.error({ err }, "File processing error");
-      extractedText = `[File: ${fileName}]\n\nFile processing failed. Using demo analysis mode.`;
+    } catch (error) {
+      req.log.warn(
+        { errorName: error instanceof Error ? error.name : "UnknownError" },
+        "File processing failed",
+      );
+      res.status(422).json({ error: "تعذر قراءة الملف المرفوع. يرجى التحقق من الملف والمحاولة مرة أخرى." });
+      return;
     }
+  }
+
+  extractedText = extractedText.trim();
+  if (extractedText.length < 50) {
+    res.status(422).json({ error: "نص العقد قصير جداً أو غير قابل للقراءة. يلزم 50 حرفاً على الأقل." });
+    return;
+  }
+  if (extractedText.length > MAX_CONTRACT_TEXT_LENGTH) {
+    res.status(413).json({
+      error: `العقد كبير جداً للتحليل. الحد الأقصى هو ${MAX_CONTRACT_TEXT_LENGTH.toLocaleString("ar-SA")} حرف.`,
+    });
+    return;
   }
 
   const contractTitle = title || fileName || `عقد جديد - ${new Date().toLocaleDateString("ar-SA")}`;
@@ -269,13 +312,59 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
     return;
   }
 
-  const { explanationLevel = "standard", outputLanguage = "ar" } = req.body as {
+  const { explanationLevel = "standard", outputLanguage = "ar", force = false } = req.body as {
     explanationLevel?: string;
     outputLanguage?: string;
+    force?: boolean;
   };
 
-  // Mark as processing
-  await db.update(contractsTable).set({ status: "processing" }).where(eq(contractsTable.id, contractId));
+  if (contract.status === "analyzed" && !force) {
+    const cached = await buildContractResponse(contractId);
+    res.json(cached);
+    return;
+  }
+
+  if ((contract.extractedText ?? "").length > MAX_CONTRACT_TEXT_LENGTH) {
+    res.status(413).json({
+      error: `العقد كبير جداً للتحليل. الحد الأقصى هو ${MAX_CONTRACT_TEXT_LENGTH.toLocaleString("ar-SA")} حرف.`,
+    });
+    return;
+  }
+
+  // A paid re-analysis must be explicitly forced. The atomic status update
+  // prevents duplicate concurrent API calls for both initial and repeat runs.
+  const claimableStatuses = force
+    ? ["pending", "analyzed", "failed"]
+    : ["pending"];
+  const [claimed] = await db
+    .update(contractsTable)
+    .set({ status: "processing" })
+    .where(
+      and(
+        eq(contractsTable.id, contractId),
+        eq(contractsTable.userId, userId),
+        inArray(contractsTable.status, claimableStatuses),
+      ),
+    )
+    .returning({ id: contractsTable.id });
+
+  if (!claimed) {
+    const current = await buildContractResponse(contractId);
+    if (!current || current.userId !== userId) {
+      res.status(404).json({ error: "Contract not found" });
+      return;
+    }
+    if (current.status === "analyzed" && !force) {
+      res.json(current);
+      return;
+    }
+    if (current.status === "processing") {
+      res.status(409).json({ error: "تحليل هذا العقد قيد التنفيذ بالفعل. يرجى الانتظار حتى يكتمل." });
+      return;
+    }
+    res.status(409).json({ error: "تعذر بدء التحليل. استخدم خيار إعادة التحليل للمحاولة مرة أخرى." });
+    return;
+  }
 
   try {
     const analysis = await analyzeContract(
@@ -285,94 +374,111 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
       outputLanguage,
     );
 
-    // Update contract with analysis results
-    await db.update(contractsTable).set({
-      status: "analyzed",
-      title: analysis.title || contract.title,
-      summary: analysis.summary,
-      startDate: analysis.startDate,
-      endDate: analysis.endDate,
-      duration: analysis.duration,
-      totalCost: analysis.totalCost,
-      currency: analysis.currency,
-      monthlyPayment: analysis.monthlyPayment,
-      annualPayment: analysis.annualPayment,
-      deposit: analysis.deposit,
-      automaticRenewal: analysis.automaticRenewal,
-      renewalNoticeDays: analysis.renewalNoticeDays,
-      cancellationAllowed: analysis.cancellationAllowed,
-      cancellationNoticeDays: analysis.cancellationNoticeDays,
-      earlyCancellationPenalty: analysis.earlyCancellationPenalty,
-      refundPolicy: analysis.refundPolicy,
-      trialPeriodDays: analysis.trialPeriodDays,
-      clarityScore: analysis.clarityScore,
-      clarityExplanation: analysis.clarityExplanation,
-      confidence: analysis.confidence,
-      suggestedQuestions: analysis.suggestedQuestions ?? [],
-    }).where(eq(contractsTable.id, contractId));
+    await db.transaction(async (tx) => {
+      await tx.update(contractsTable).set({
+        status: "analyzed",
+        title: analysis.title || contract.title,
+        summary: analysis.summary,
+        startDate: analysis.startDate,
+        endDate: analysis.endDate,
+        duration: analysis.duration,
+        totalCost: analysis.totalCost,
+        currency: analysis.currency,
+        monthlyPayment: analysis.monthlyPayment,
+        annualPayment: analysis.annualPayment,
+        deposit: analysis.deposit,
+        automaticRenewal: analysis.automaticRenewal,
+        renewalNoticeDays: analysis.renewalNoticeDays,
+        cancellationAllowed: analysis.cancellationAllowed,
+        cancellationNoticeDays: analysis.cancellationNoticeDays,
+        earlyCancellationPenalty: analysis.earlyCancellationPenalty,
+        refundPolicy: analysis.refundPolicy,
+        trialPeriodDays: analysis.trialPeriodDays,
+        clarityScore: analysis.clarityScore,
+        clarityExplanation: analysis.clarityExplanation,
+        confidence: analysis.confidence,
+        suggestedQuestions: analysis.suggestedQuestions,
+        rawAnalysis: JSON.stringify(analysis),
+      }).where(eq(contractsTable.id, contractId));
 
-    // Insert parties
-    if (analysis.parties?.length) {
-      await db.delete(contractPartiesTable).where(eq(contractPartiesTable.contractId, contractId));
-      await db.insert(contractPartiesTable).values(
-        analysis.parties.map((p) => ({ contractId, name: p.name, role: p.role })),
-      );
-    }
+      // A PostgreSQL transaction uses one client connection, so its queries must
+      // run sequentially. Running these deletes concurrently triggers pg's
+      // "client is already executing a query" warning and will fail in pg 9.
+      await tx.delete(contractPartiesTable).where(eq(contractPartiesTable.contractId, contractId));
+      await tx.delete(contractClausesTable).where(eq(contractClausesTable.contractId, contractId));
+      await tx.delete(contractFinancialDetailsTable).where(eq(contractFinancialDetailsTable.contractId, contractId));
+      await tx.delete(contractDatesTable).where(eq(contractDatesTable.contractId, contractId));
 
-    // Insert clauses
-    if (analysis.clauses?.length) {
-      await db.delete(contractClausesTable).where(eq(contractClausesTable.contractId, contractId));
-      await db.insert(contractClausesTable).values(
-        analysis.clauses.map((c) => ({
-          contractId,
-          category: c.category,
-          title: c.title,
-          simpleExplanation: c.simpleExplanation,
-          riskLevel: c.riskLevel,
-          sourcePage: c.sourcePage ?? null,
-          sourceText: c.sourceText ?? null,
-          confidence: null,
-        })),
-      );
-    }
+      if (analysis.parties.length) {
+        await tx.insert(contractPartiesTable).values(
+          analysis.parties.map((party) => ({
+            contractId,
+            name: party.name,
+            role: party.role,
+          })),
+        );
+      }
 
-    // Insert financial details
-    if (analysis.financialDetails?.length) {
-      await db.delete(contractFinancialDetailsTable).where(eq(contractFinancialDetailsTable.contractId, contractId));
-      await db.insert(contractFinancialDetailsTable).values(
-        analysis.financialDetails.map((f) => ({
-          contractId,
-          type: f.type,
-          amount: f.amount,
-          currency: f.currency ?? "SAR",
-          description: f.description ?? null,
-          sourcePage: f.sourcePage ?? null,
-        })),
-      );
-    }
+      if (analysis.clauses.length) {
+        await tx.insert(contractClausesTable).values(
+          analysis.clauses.map((clause) => ({
+            contractId,
+            category: clause.category,
+            title: clause.title,
+            simpleExplanation: clause.simpleExplanation,
+            riskLevel: clause.riskLevel,
+            sourcePage: clause.sourcePage,
+            sourceText: clause.sourceText,
+            confidence: null,
+          })),
+        );
+      }
 
-    // Insert dates
-    if (analysis.contractDates?.length) {
-      await db.delete(contractDatesTable).where(eq(contractDatesTable.contractId, contractId));
-      await db.insert(contractDatesTable).values(
-        analysis.contractDates.map((d) => ({
-          contractId,
-          type: d.type,
-          date: d.date,
-          description: d.description ?? null,
-          sourcePage: d.sourcePage ?? null,
-        })),
-      );
-    }
+      if (analysis.financialDetails.length) {
+        await tx.insert(contractFinancialDetailsTable).values(
+          analysis.financialDetails.map((detail) => ({
+            contractId,
+            type: detail.type,
+            amount: detail.amount,
+            currency: detail.currency,
+            description: detail.description,
+            sourcePage: detail.sourcePage,
+          })),
+        );
+      }
+
+      if (analysis.contractDates.length) {
+        await tx.insert(contractDatesTable).values(
+          analysis.contractDates.map((contractDate) => ({
+            contractId,
+            type: contractDate.type,
+            date: contractDate.date,
+            description: contractDate.description,
+            sourcePage: contractDate.sourcePage,
+          })),
+        );
+      }
+    });
 
     await logActivity(userId, "analyze_contract", "contract", contractId);
 
     const full = await buildContractResponse(contractId);
     res.json(full);
-  } catch (err) {
-    logger.error({ err }, "Analysis failed");
-    await db.update(contractsTable).set({ status: "failed" }).where(eq(contractsTable.id, contractId));
-    res.status(500).json({ error: "Analysis failed. Please try again." });
+  } catch (error) {
+    logger.error(
+      { errorName: error instanceof Error ? error.name : "UnknownError", contractId },
+      "Contract analysis request failed",
+    );
+    await db
+      .update(contractsTable)
+      .set({ status: contract.status === "analyzed" ? "analyzed" : "failed" })
+      .where(eq(contractsTable.id, contractId));
+    res.status(502).json({
+      error:
+        error instanceof ContractAnalysisError
+          ? error.message
+          : "تعذر إكمال تحليل العقد. لم يتم استخدام نتائج تجريبية. يرجى المحاولة مرة أخرى.",
+    });
   }
 });
 

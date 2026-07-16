@@ -110,6 +110,17 @@ export default function UploadContract() {
       });
       return;
     }
+    if (inputMode === "text" && pastedText.length > 120_000) {
+      toast({
+        title: language === "ar" ? "النص كبير جداً" : "Text is too large",
+        description:
+          language === "ar"
+            ? "الحد الأقصى للتحليل هو 120,000 حرف لتجنب استهلاك غير ضروري لرصيد API."
+            : "The analysis limit is 120,000 characters to avoid unnecessary API usage.",
+        variant: "destructive",
+      });
+      return;
+    }
     setStep(2);
   };
 
@@ -148,7 +159,7 @@ export default function UploadContract() {
       onError: (err: any) => {
         toast({
           title: language === 'ar' ? "فشل الرفع" : "Upload failed",
-          description: err.message || (language === 'ar' ? "حدث خطأ غير متوقع." : "An unexpected error occurred."),
+          description: err?.data?.error || err.message || (language === 'ar' ? "حدث خطأ غير متوقع." : "An unexpected error occurred."),
           variant: "destructive"
         });
       }
@@ -275,9 +286,9 @@ export default function UploadContract() {
                   dir="auto"
                 />
                 <div className="text-sm text-slate-500 flex justify-between px-2">
-                  <span>{language === 'ar' ? 'الحد الأدنى: 50 حرف' : 'Minimum: 50 characters'}</span>
-                  <span className={pastedText.length >= 50 ? 'text-teal-600' : 'text-slate-400'}>
-                    {pastedText.length} {language === 'ar' ? 'حرف' : 'chars'}
+                  <span>{language === 'ar' ? 'من 50 إلى 120,000 حرف' : '50 to 120,000 characters'}</span>
+                  <span className={pastedText.length > 120_000 ? 'text-red-600' : pastedText.length >= 50 ? 'text-teal-600' : 'text-slate-400'}>
+                    {pastedText.length.toLocaleString()} {language === 'ar' ? 'حرف' : 'chars'}
                   </span>
                 </div>
               </div>

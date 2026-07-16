@@ -408,10 +408,12 @@ export const AnalyzeContractParams = zod.object({
 
 export const analyzeContractBodyExplanationLevelDefault = `standard`;
 export const analyzeContractBodyOutputLanguageDefault = `ar`;
+export const analyzeContractBodyForceDefault = false;
 
 export const AnalyzeContractBody = zod.object({
   "explanationLevel": zod.enum(['simple', 'standard', 'detailed']).default(analyzeContractBodyExplanationLevelDefault),
-  "outputLanguage": zod.enum(['ar', 'en']).default(analyzeContractBodyOutputLanguageDefault)
+  "outputLanguage": zod.enum(['ar', 'en']).default(analyzeContractBodyOutputLanguageDefault),
+  "force": zod.boolean().default(analyzeContractBodyForceDefault).describe('Explicitly replace a completed analysis; this can consume API credit.')
 })
 
 export const AnalyzeContractResponse = zod.object({

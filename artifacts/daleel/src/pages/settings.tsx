@@ -34,10 +34,19 @@ export default function Settings() {
   }, [user]);
 
   const handleSave = () => {
-    updateMutation.mutate({ data: { fullName: name, preferredLanguage: prefLang } }, {
+    const fullName = name.trim();
+    if (!fullName) {
+      toast({
+        title: currentLang === 'ar' ? 'الاسم الكامل مطلوب' : 'Full name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateMutation.mutate({ data: { fullName, preferredLanguage: prefLang } }, {
       onSuccess: () => {
-        toast({ title: currentLang === 'ar' ? 'تم حفظ الإعدادات' : 'Settings saved' });
         setLanguage(prefLang); // Update UI context instantly
+        toast({ title: prefLang === 'ar' ? 'تم حفظ الإعدادات' : 'Settings saved' });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       }
     });
@@ -63,17 +72,17 @@ export default function Settings() {
           
           <div className="space-y-6">
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label htmlFor="settings-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 {currentLang === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
               </label>
-              <Input value={user?.email || ""} disabled className="bg-slate-50 dark:bg-slate-900 opacity-60" />
+              <Input id="settings-email" value={user?.email || ""} disabled className="bg-slate-50 dark:bg-slate-900 opacity-60" />
             </div>
             
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label htmlFor="settings-full-name" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 {currentLang === 'ar' ? 'الاسم الكامل' : 'Full Name'}
               </label>
-              <Input value={name} onChange={e => setName(e.target.value)} className="bg-slate-50 dark:bg-slate-900 focus-visible:ring-teal-500" />
+              <Input id="settings-full-name" value={name} onChange={e => setName(e.target.value)} className="bg-slate-50 dark:bg-slate-900 focus-visible:ring-teal-500" />
             </div>
           </div>
         </div>
@@ -110,7 +119,7 @@ export default function Settings() {
         <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-end">
           <Button 
             onClick={handleSave} 
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || !name.trim()}
             className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl px-8"
           >
             {updateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0 animate-spin" /> : <Save className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />}

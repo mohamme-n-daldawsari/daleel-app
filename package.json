@@ -3,8 +3,14 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "preinstall": "node ./scripts/preinstall.mjs",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "local:env:setup": "node ./scripts/setup-local-env.mjs",
+    "local:db:up": "docker compose --env-file .env.local up -d --wait",
+    "local:db:down": "docker compose --env-file .env.local down",
+    "local:db:status": "docker compose --env-file .env.local ps",
+    "local:db:push": "node ./scripts/run-with-local-env.mjs --filter @workspace/db push",
+    "local:db:seed": "node ./scripts/run-with-local-env.mjs --filter @workspace/db seed",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },

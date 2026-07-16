@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { useUser, useClerk } from "@clerk/react";
+import { useClerk } from "@clerk/react";
+import { useGetMe } from "@workspace/api-client-react";
 import { useTranslation } from "@/lib/i18n";
 import { useApp } from "@/components/app-provider";
 import { 
@@ -14,8 +15,8 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { user } = useUser();
   const { signOut } = useClerk();
+  const { data: dbUser } = useGetMe();
   const [, setLocation] = useLocation();
   const { t, language } = useTranslation();
   const { setLanguage } = useApp();
@@ -23,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
 
   const [currentPath] = useLocation();
 
-  const isAdmin = user?.publicMetadata?.role === 'admin';
+  const isAdmin = dbUser?.role === 'admin';
 
   const navItems = [
     { href: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
@@ -99,7 +100,13 @@ export function AppShell({ children }: AppShellProps) {
                 </div>
                 <span className="font-bold text-xl text-white">دليل</span>
               </div>
-              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white" onClick={() => setMobileMenuOpen(false)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-slate-400 hover:text-white"
+                aria-label="Close navigation menu"
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 <X className="w-6 h-6" />
               </Button>
             </div>
@@ -140,7 +147,12 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Mobile Header */}
         <header className="md:hidden h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-10 shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Open navigation menu"
+            onClick={() => setMobileMenuOpen(true)}
+          >
             <Menu className="w-6 h-6" />
           </Button>
           <div className="font-bold text-lg">دليل</div>
