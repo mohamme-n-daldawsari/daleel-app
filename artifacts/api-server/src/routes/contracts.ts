@@ -160,6 +160,12 @@ router.post("/contracts/upload", requireAuth, async (req, res): Promise<void> =>
     extractedText = await extractContractText({ pastedText, fileBase64, fileName, fileType });
   } catch (error) {
     if (error instanceof DocumentExtractionError) {
+      if (error.cause) {
+        req.log.warn(
+          { err: error.cause, statusCode: error.status },
+          "PDF text extraction failed",
+        );
+      }
       res.status(error.status).json({ error: error.message });
       return;
     }

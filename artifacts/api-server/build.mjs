@@ -100,6 +100,10 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // pdf-parse bundles PDF.js, whose Node DOM/canvas polyfills depend on
+      // resolving sibling runtime modules. Embedding it in index.mjs breaks
+      // that resolution and leaves DOMMatrix undefined during PDF loading.
+      "pdf-parse",
     ],
     sourcemap: "linked",
     plugins: [
