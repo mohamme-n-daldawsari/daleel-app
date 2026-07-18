@@ -1,6 +1,14 @@
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import PDFDocument from "pdfkit";
+import {
+  arabicActionPriorityLabel,
+  arabicClauseCategoryLabel,
+  arabicDateTypeLabel,
+  arabicFinancialTypeLabel,
+  arabicRiskLabel,
+  normalizeClarityScore,
+} from "@workspace/api-zod/presentation";
 
 const require = createRequire(import.meta.url);
 const WINDOWS_ARABIC_FONT = "C:\\Windows\\Fonts\\arial.ttf";
@@ -85,10 +93,6 @@ function arabicContractType(value: string): string {
   return labels[value] ?? value;
 }
 
-function arabicRisk(value?: string | null): string {
-  return value === "high" ? "مرتفع" : value === "medium" ? "متوسط" : value === "low" ? "منخفض" : "غير محدد";
-}
-
 function arabicConfidence(value: number): string {
   return value >= 0.9 ? "مرتفعة" : value >= 0.7 ? "متوسطة" : "منخفضة";
 }
@@ -166,7 +170,7 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
     }
     for (const item of items) {
       ensureSpace(125);
-      rtl(`• ${item.title}`, { size: 11.5, color: item.riskLevel === "high" ? "#A13D2D" : ink });
+      rtl(`• ${item.title} — ${arabicClauseCategoryLabel(item.category)} — ${arabicRiskLabel(item.riskLevel)}`, { size: 11.5, color: item.riskLevel === "high" ? "#A13D2D" : ink });
       rtl(item.simpleExplanation, { color: muted, indent: 12 });
       rtl(`الدليل: ${item.sourceText || "لم يُعثر على نص داعم في العقد."}${item.sourcePage != null ? ` — الصفحة ${item.sourcePage}` : ""}${item.confidence != null ? ` — درجة الثقة ${arabicConfidence(item.confidence)}` : ""}`, { size: 9.5, color: "#687775", indent: 12 });
     }
@@ -180,7 +184,7 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
 
   rtl(report.title, { size: 21, color: ink, gap: 8 });
   rtl(`نوع العقد: ${arabicContractType(report.contractType)}`, { color: muted });
-  rtl(`مستوى المخاطر: ${arabicRisk(report.overallRiskLevel)}، درجة الوضوح: ${report.clarityScore ?? "غير متاحة"} من 100`, { color: teal });
+  rtl(`مستوى المخاطر: ${report.overallRiskLevel ? arabicRiskLabel(report.overallRiskLevel) : "غير محدد"}، درجة الوضوح: ${normalizeClarityScore(report.clarityScore) ?? "غير متاحة"} من 100`, { color: teal });
   if (report.confidence != null) rtl(`ثقة التحليل: ${Math.round(report.confidence * 100)}%`, { color: teal });
 
   heading("الملخص التنفيذي");
@@ -190,7 +194,8 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
   if (!report.financialDetails?.length) rtl("لم يُعثر على تفاصيل مالية محددة.", { color: muted });
   for (const item of report.financialDetails ?? []) {
     ensureSpace(82);
-    rtl(`• ${item.description || item.type}: ${item.amount.toLocaleString("ar-SA")} ${item.currency}`, { size: 11.5 });
+    rtl(`• ${arabicFinancialTypeLabel(item.type, item)}: ${item.amount.toLocaleString("ar-SA")} ${item.currency}`, { size: 11.5 });
+    if (item.description) rtl(item.description, { color: muted, indent: 12 });
     rtl(`الدليل: ${item.sourceText || "لم يُعثر على نص داعم في العقد."}${item.sourcePage != null ? ` — الصفحة ${item.sourcePage}` : ""}${item.confidence != null ? ` — درجة الثقة ${arabicConfidence(item.confidence)}` : ""}`, { size: 9.5, color: "#687775", indent: 12 });
   }
 
@@ -199,7 +204,7 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
   if (!topRisks.length) rtl("لم تظهر مخاطر مرتفعة في التحليل.");
   for (const item of topRisks) {
     ensureSpace(125);
-    rtl(`• ${item.title}`, { size: 12, color: "#A13D2D" });
+    rtl(`• ${item.title} — ${arabicClauseCategoryLabel(item.category)} — ${arabicRiskLabel(item.riskLevel)}`, { size: 12, color: "#A13D2D" });
     rtl(item.simpleExplanation, { color: muted, indent: 12 });
     rtl(`الدليل: ${item.sourceText || "لم يُعثر على نص داعم في العقد."}${item.sourcePage != null ? ` — الصفحة ${item.sourcePage}` : ""}`, { size: 9.5, color: "#687775", indent: 12 });
     if (item.confidence != null) rtl(`درجة الثقة: ${arabicConfidence(item.confidence)}`, { size: 9.5, color: "#687775", indent: 12 });
@@ -215,7 +220,7 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
   if (!report.actionPlan?.length) rtl("لا توجد خطوات عملية مقترحة.");
   for (const item of report.actionPlan ?? []) {
     ensureSpace(125);
-    rtl(`• ${item.recommendedAction}`, { size: 12, color: teal });
+    rtl(`• ${item.recommendedAction} — ${arabicActionPriorityLabel(item.priority)}`, { size: 12, color: teal });
     rtl(item.rationale, { color: muted, indent: 12 });
     if (item.deadline) rtl(`الموعد: ${item.deadline}`, { color: "#A13D2D", indent: 12 });
     rtl(`الدليل: ${item.sourceText || "لم يُعثر على نص داعم في العقد."} — درجة الثقة ${arabicConfidence(item.confidence)}`, { size: 9.5, color: "#687775", indent: 12 });
@@ -225,7 +230,7 @@ function buildPdf(write: (chunk: Buffer) => void, done: () => void, report: PdfC
   if (!report.contractDates.length) rtl("لم يُعثر على تواريخ محددة.");
   for (const item of report.contractDates) {
     ensureSpace(76);
-    rtl(`• ${item.date} — ${item.description || item.type}`, { size: 11.5 });
+    rtl(`• ${item.date} — ${item.description || arabicDateTypeLabel(item.type)}`, { size: 11.5 });
     rtl(`الدليل: ${item.sourceText || "لم يُعثر على نص داعم في العقد."}${item.sourcePage != null ? ` — الصفحة ${item.sourcePage}` : ""}${item.confidence != null ? ` — درجة الثقة ${arabicConfidence(item.confidence)}` : ""}`, { size: 9.5, color: "#687775", indent: 12 });
   }
 

@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, ilike, desc, count, inArray } from "drizzle-orm";
+import { normalizeClarityScore } from "@workspace/api-zod/presentation";
 import {
   db,
   contractsTable,
@@ -91,6 +92,7 @@ async function buildContractResponse(contractId: number) {
 
   return {
     ...contract,
+    clarityScore: normalizeClarityScore(contract.clarityScore),
     parties,
     clauses: enrichedClauses,
     financialDetails: enrichedFinancialDetails,
