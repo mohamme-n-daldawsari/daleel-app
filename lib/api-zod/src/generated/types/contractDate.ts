@@ -14,4 +14,8 @@ export interface ContractDate {
   description?: string | null;
   /** @nullable */
   sourcePage?: number | null;
+  /** @nullable */
+  sourceText?: string | null;
+  /** @nullable */
+  confidence?: number | null;
 }

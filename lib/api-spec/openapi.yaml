@@ -230,6 +230,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Contract"
 
+  /contracts/sample:
+    post:
+      operationId: createSampleContract
+      tags: [contracts]
+      summary: Create or return the fictional pre-analyzed sample contract
+      responses:
+        "201":
+          description: Sample contract created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+        "200":
+          description: Existing sample contract returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contract"
+
   /contracts/{contractId}:
     get:
       operationId: getContract
@@ -838,6 +857,11 @@ components:
           type: ["string", "null"]
         confidence:
           type: ["number", "null"]
+        overallRiskLevel:
+          type: ["string", "null"]
+          enum: [low, medium, high, null]
+        isDemo:
+          type: boolean
         summary:
           type: ["string", "null"]
         parties:
@@ -888,6 +912,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ContractDate"
+        actionPlan:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionPlanItem"
         suggestedQuestions:
           type: array
           items:
@@ -950,6 +978,8 @@ components:
           type: ["integer", "null"]
         sourceText:
           type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
 
     ContractDate:
       type: object
@@ -966,6 +996,36 @@ components:
           type: ["string", "null"]
         sourcePage:
           type: ["integer", "null"]
+        sourceText:
+          type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
+
+    ActionPlanItem:
+      type: object
+      required: [priority, recommendedAction, rationale, reminderSuggested, confidence]
+      properties:
+        priority:
+          type: string
+          enum: [urgent, high, medium, low]
+        recommendedAction:
+          type: string
+        rationale:
+          type: string
+        sourceText:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]
+          format: date
+        reminderSuggested:
+          type: boolean
+        reminderTitle:
+          type: ["string", "null"]
+        reminderType:
+          type: ["string", "null"]
+          enum: [expiry, renewal, cancellation, payment, other, null]
+        confidence:
+          type: number
 
     CompareInput:
       type: object
@@ -1051,7 +1111,7 @@ components:
           format: date
         type:
           type: string
-          enum: [expiry, renewal, cancellation, payment, trial_end, warranty]
+          enum: [expiry, renewal, cancellation, payment, trial_end, warranty, other]
 
     ReminderUpdate:
       type: object

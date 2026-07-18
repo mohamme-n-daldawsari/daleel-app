@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './actionPlanItem';
+export * from './actionPlanItemPriority';
+export * from './actionPlanItemReminderType';
 export * from './activityLog';
 export * from './adminStats';
 export * from './analysisOptions';
@@ -20,6 +23,7 @@ export * from './comparisonDifferenceAdvantage';
 export * from './comparisonResult';
 export * from './contract';
 export * from './contractDate';
+export * from './contractOverallRiskLevel';
 export * from './contractStatus';
 export * from './contractSummary';
 export * from './contractSummaryStatus';

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "@/lib/i18n";
-import { useUploadContract } from "@workspace/api-client-react";
+import { useCreateSampleContract, useUploadContract } from "@workspace/api-client-react";
 import { 
-  UploadCloud, FileText, File, FileImage, 
-  AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, Loader2
+  UploadCloud, FileText, FileImage,
+  AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, Loader2, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ export default function UploadContract() {
   const { toast } = useToast();
   
   const uploadContractMutation = useUploadContract();
+  const sampleMutation = useCreateSampleContract();
 
   const [step, setStep] = useState(1);
   const [inputMode, setInputMode] = useState<"file" | "text">("file");
@@ -166,6 +167,23 @@ export default function UploadContract() {
     });
   };
 
+  const handleSample = () => {
+    sampleMutation.mutate(undefined, {
+      onSuccess: (contract) => {
+        toast({
+          title: language === "ar" ? "النموذج الخيالي جاهز" : "Fictional sample is ready",
+          description: language === "ar" ? "نتيجة محفوظة مسبقاً — لم يُستهلك رصيد OpenAI." : "Pre-generated result — no OpenAI credit was used.",
+        });
+        setLocation(`/contracts/${contract.id}`);
+      },
+      onError: (error: any) => toast({
+        title: language === "ar" ? "تعذر فتح النموذج" : "Could not open sample",
+        description: error?.data?.error || error?.message,
+        variant: "destructive",
+      }),
+    });
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
@@ -177,9 +195,20 @@ export default function UploadContract() {
             {language === 'ar' ? 'رفع عقد جديد' : 'Upload New Contract'}
           </h1>
           <p className="text-slate-500 mt-1">
-            {language === 'ar' ? 'قم برفع ملف PDF أو صورة، أو انسخ والصق نص العقد مباشرة.' : 'Upload a PDF or image file, or copy and paste the contract text directly.'}
+            {language === 'ar' ? 'ارفع ملف PDF قابلاً للبحث، أو انسخ والصق نص العقد مباشرة.' : 'Upload a searchable PDF, or copy and paste the contract text directly.'}
           </p>
         </div>
+      </div>
+
+      <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900/50 dark:bg-violet-950/30 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2 font-bold text-violet-950 dark:text-violet-100"><Sparkles className="h-5 w-5" />{language === "ar" ? "جرّب دليل خلال ثوانٍ" : "Try Daleel in seconds"}</div>
+          <p className="mt-1 text-sm text-violet-800 dark:text-violet-200">{language === "ar" ? "افتح عقد خدمات خيالياً بنتيجة غنية محفوظة مسبقاً، من دون رفع ملف أو استهلاك رصيد OpenAI." : "Open a fictional service contract with a rich pre-generated result, without uploading a file or using OpenAI credit."}</p>
+        </div>
+        <Button onClick={handleSample} disabled={sampleMutation.isPending} className="shrink-0 bg-violet-700 text-white hover:bg-violet-800">
+          {sampleMutation.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Sparkles className="me-2 h-4 w-4" />}
+          {language === "ar" ? "تجربة العقد النموذجي" : "Try sample contract"}
+        </Button>
       </div>
 
       {/* Progress Steps */}
@@ -222,7 +251,7 @@ export default function UploadContract() {
             <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
               <TabsTrigger value="file" className="rounded-lg py-2.5">
                 <UploadCloud className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
-                {language === 'ar' ? 'رفع ملف (PDF / صورة)' : 'Upload File (PDF / Image)'}
+                {language === 'ar' ? 'رفع ملف PDF' : 'Upload PDF'}
               </TabsTrigger>
               <TabsTrigger value="text" className="rounded-lg py-2.5">
                 <FileText className="w-4 h-4 mr-2 rtl:ml-2 rtl:mr-0" />
@@ -241,7 +270,7 @@ export default function UploadContract() {
                   <input 
                     id="file-upload" 
                     type="file" 
-                    accept="application/pdf,image/png,image/jpeg,image/webp" 
+                    accept="application/pdf,.pdf"
                     className="hidden" 
                     onChange={handleFileChange}
                   />
@@ -252,7 +281,7 @@ export default function UploadContract() {
                     {language === 'ar' ? 'اسحب وأفلت الملف هنا' : 'Drag and drop file here'}
                   </h3>
                   <p className="text-slate-500 mb-6 max-w-sm">
-                    {language === 'ar' ? 'أو انقر لاختيار ملف. ندعم صيغ PDF، PNG، JPG، WEBP.' : 'Or click to select a file. We support PDF, PNG, JPG, WEBP formats.'}
+                    {language === 'ar' ? 'أو انقر لاختيار PDF نصي قابل للبحث. الملفات الممسوحة ضوئياً تحتاج OCR وهو غير متاح حالياً.' : 'Or choose a searchable text PDF. Scanned files need OCR, which is not currently available.'}
                   </p>
                   <Button variant="outline" className="rounded-full bg-white dark:bg-slate-900 pointer-events-none">
                     {language === 'ar' ? 'اختيار ملف' : 'Select File'}

@@ -196,6 +196,18 @@ export const ContractStatus = {
   failed: 'failed',
 } as const;
 
+/**
+ * @nullable
+ */
+export type ContractOverallRiskLevel = typeof ContractOverallRiskLevel[keyof typeof ContractOverallRiskLevel] | null;
+
+
+export const ContractOverallRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
 export interface Party {
   id: number;
   name: string;
@@ -236,6 +248,8 @@ export interface FinancialDetail {
   sourcePage?: number | null;
   /** @nullable */
   sourceText?: string | null;
+  /** @nullable */
+  confidence?: number | null;
 }
 
 export interface ContractDate {
@@ -246,6 +260,50 @@ export interface ContractDate {
   description?: string | null;
   /** @nullable */
   sourcePage?: number | null;
+  /** @nullable */
+  sourceText?: string | null;
+  /** @nullable */
+  confidence?: number | null;
+}
+
+export type ActionPlanItemPriority = typeof ActionPlanItemPriority[keyof typeof ActionPlanItemPriority];
+
+
+export const ActionPlanItemPriority = {
+  urgent: 'urgent',
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ActionPlanItemReminderType = typeof ActionPlanItemReminderType[keyof typeof ActionPlanItemReminderType] | null;
+
+
+export const ActionPlanItemReminderType = {
+  expiry: 'expiry',
+  renewal: 'renewal',
+  cancellation: 'cancellation',
+  payment: 'payment',
+  other: 'other',
+} as const;
+
+export interface ActionPlanItem {
+  priority: ActionPlanItemPriority;
+  recommendedAction: string;
+  rationale: string;
+  /** @nullable */
+  sourceText?: string | null;
+  /** @nullable */
+  deadline?: string | null;
+  reminderSuggested: boolean;
+  /** @nullable */
+  reminderTitle?: string | null;
+  /** @nullable */
+  reminderType?: ActionPlanItemReminderType;
+  confidence: number;
 }
 
 export interface Contract {
@@ -265,6 +323,9 @@ export interface Contract {
   clarityExplanation?: string | null;
   /** @nullable */
   confidence?: number | null;
+  /** @nullable */
+  overallRiskLevel?: ContractOverallRiskLevel;
+  isDemo?: boolean;
   /** @nullable */
   summary?: string | null;
   parties?: Party[];
@@ -301,6 +362,7 @@ export interface Contract {
   clauses?: Clause[];
   financialDetails?: FinancialDetail[];
   contractDates?: ContractDate[];
+  actionPlan?: ActionPlanItem[];
   suggestedQuestions?: string[];
   createdAt: string;
   updatedAt?: string;
@@ -362,6 +424,7 @@ export const ReminderInputType = {
   payment: 'payment',
   trial_end: 'trial_end',
   warranty: 'warranty',
+  other: 'other',
 } as const;
 
 export interface ReminderInput {

@@ -187,6 +187,8 @@ export const UploadContractResponse = zod.object({
   "clarityScore": zod.number().nullish(),
   "clarityExplanation": zod.string().nullish(),
   "confidence": zod.number().nullish(),
+  "overallRiskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "isDemo": zod.boolean().optional(),
   "summary": zod.string().nullish(),
   "parties": zod.array(zod.object({
   "id": zod.number(),
@@ -225,14 +227,111 @@ export const UploadContractResponse = zod.object({
   "currency": zod.string(),
   "description": zod.string().nullish(),
   "sourcePage": zod.number().nullish(),
-  "sourceText": zod.string().nullish()
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
 })).optional(),
   "contractDates": zod.array(zod.object({
   "id": zod.number(),
   "type": zod.string(),
   "date": zod.coerce.date(),
   "description": zod.string().nullish(),
-  "sourcePage": zod.number().nullish()
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "actionPlan": zod.array(zod.object({
+  "priority": zod.enum(['urgent', 'high', 'medium', 'low']),
+  "recommendedAction": zod.string(),
+  "rationale": zod.string(),
+  "sourceText": zod.string().nullish(),
+  "deadline": zod.coerce.date().nullish(),
+  "reminderSuggested": zod.boolean(),
+  "reminderTitle": zod.string().nullish(),
+  "reminderType": zod.union([zod.literal('expiry'),zod.literal('renewal'),zod.literal('cancellation'),zod.literal('payment'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "confidence": zod.number()
+})).optional(),
+  "suggestedQuestions": zod.array(zod.string()).optional(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Create or return the fictional pre-analyzed sample contract
+ */
+export const CreateSampleContractResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "contractType": zod.string(),
+  "originalFileName": zod.string().nullish(),
+  "language": zod.string().nullish(),
+  "extractedText": zod.string().nullish(),
+  "status": zod.enum(['pending', 'processing', 'analyzed', 'failed']),
+  "clarityScore": zod.number().nullish(),
+  "clarityExplanation": zod.string().nullish(),
+  "confidence": zod.number().nullish(),
+  "overallRiskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "isDemo": zod.boolean().optional(),
+  "summary": zod.string().nullish(),
+  "parties": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.string()
+})).optional(),
+  "startDate": zod.coerce.date().nullish(),
+  "endDate": zod.coerce.date().nullish(),
+  "duration": zod.string().nullish(),
+  "totalCost": zod.number().nullish(),
+  "currency": zod.string().nullish(),
+  "monthlyPayment": zod.number().nullish(),
+  "annualPayment": zod.number().nullish(),
+  "deposit": zod.number().nullish(),
+  "automaticRenewal": zod.boolean().nullish(),
+  "renewalNoticeDays": zod.number().nullish(),
+  "cancellationAllowed": zod.boolean().nullish(),
+  "cancellationNoticeDays": zod.number().nullish(),
+  "earlyCancellationPenalty": zod.number().nullish(),
+  "refundPolicy": zod.string().nullish(),
+  "trialPeriodDays": zod.number().nullish(),
+  "clauses": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "title": zod.string(),
+  "simpleExplanation": zod.string(),
+  "riskLevel": zod.enum(['low', 'medium', 'high']),
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "financialDetails": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "amount": zod.number(),
+  "currency": zod.string(),
+  "description": zod.string().nullish(),
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "contractDates": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "date": zod.coerce.date(),
+  "description": zod.string().nullish(),
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "actionPlan": zod.array(zod.object({
+  "priority": zod.enum(['urgent', 'high', 'medium', 'low']),
+  "recommendedAction": zod.string(),
+  "rationale": zod.string(),
+  "sourceText": zod.string().nullish(),
+  "deadline": zod.coerce.date().nullish(),
+  "reminderSuggested": zod.boolean(),
+  "reminderTitle": zod.string().nullish(),
+  "reminderType": zod.union([zod.literal('expiry'),zod.literal('renewal'),zod.literal('cancellation'),zod.literal('payment'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "confidence": zod.number()
 })).optional(),
   "suggestedQuestions": zod.array(zod.string()).optional(),
   "createdAt": zod.coerce.date(),
@@ -258,6 +357,8 @@ export const GetContractResponse = zod.object({
   "clarityScore": zod.number().nullish(),
   "clarityExplanation": zod.string().nullish(),
   "confidence": zod.number().nullish(),
+  "overallRiskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "isDemo": zod.boolean().optional(),
   "summary": zod.string().nullish(),
   "parties": zod.array(zod.object({
   "id": zod.number(),
@@ -296,14 +397,28 @@ export const GetContractResponse = zod.object({
   "currency": zod.string(),
   "description": zod.string().nullish(),
   "sourcePage": zod.number().nullish(),
-  "sourceText": zod.string().nullish()
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
 })).optional(),
   "contractDates": zod.array(zod.object({
   "id": zod.number(),
   "type": zod.string(),
   "date": zod.coerce.date(),
   "description": zod.string().nullish(),
-  "sourcePage": zod.number().nullish()
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "actionPlan": zod.array(zod.object({
+  "priority": zod.enum(['urgent', 'high', 'medium', 'low']),
+  "recommendedAction": zod.string(),
+  "rationale": zod.string(),
+  "sourceText": zod.string().nullish(),
+  "deadline": zod.coerce.date().nullish(),
+  "reminderSuggested": zod.boolean(),
+  "reminderTitle": zod.string().nullish(),
+  "reminderType": zod.union([zod.literal('expiry'),zod.literal('renewal'),zod.literal('cancellation'),zod.literal('payment'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "confidence": zod.number()
 })).optional(),
   "suggestedQuestions": zod.array(zod.string()).optional(),
   "createdAt": zod.coerce.date(),
@@ -334,6 +449,8 @@ export const UpdateContractResponse = zod.object({
   "clarityScore": zod.number().nullish(),
   "clarityExplanation": zod.string().nullish(),
   "confidence": zod.number().nullish(),
+  "overallRiskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "isDemo": zod.boolean().optional(),
   "summary": zod.string().nullish(),
   "parties": zod.array(zod.object({
   "id": zod.number(),
@@ -372,14 +489,28 @@ export const UpdateContractResponse = zod.object({
   "currency": zod.string(),
   "description": zod.string().nullish(),
   "sourcePage": zod.number().nullish(),
-  "sourceText": zod.string().nullish()
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
 })).optional(),
   "contractDates": zod.array(zod.object({
   "id": zod.number(),
   "type": zod.string(),
   "date": zod.coerce.date(),
   "description": zod.string().nullish(),
-  "sourcePage": zod.number().nullish()
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "actionPlan": zod.array(zod.object({
+  "priority": zod.enum(['urgent', 'high', 'medium', 'low']),
+  "recommendedAction": zod.string(),
+  "rationale": zod.string(),
+  "sourceText": zod.string().nullish(),
+  "deadline": zod.coerce.date().nullish(),
+  "reminderSuggested": zod.boolean(),
+  "reminderTitle": zod.string().nullish(),
+  "reminderType": zod.union([zod.literal('expiry'),zod.literal('renewal'),zod.literal('cancellation'),zod.literal('payment'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "confidence": zod.number()
 })).optional(),
   "suggestedQuestions": zod.array(zod.string()).optional(),
   "createdAt": zod.coerce.date(),
@@ -427,6 +558,8 @@ export const AnalyzeContractResponse = zod.object({
   "clarityScore": zod.number().nullish(),
   "clarityExplanation": zod.string().nullish(),
   "confidence": zod.number().nullish(),
+  "overallRiskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "isDemo": zod.boolean().optional(),
   "summary": zod.string().nullish(),
   "parties": zod.array(zod.object({
   "id": zod.number(),
@@ -465,14 +598,28 @@ export const AnalyzeContractResponse = zod.object({
   "currency": zod.string(),
   "description": zod.string().nullish(),
   "sourcePage": zod.number().nullish(),
-  "sourceText": zod.string().nullish()
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
 })).optional(),
   "contractDates": zod.array(zod.object({
   "id": zod.number(),
   "type": zod.string(),
   "date": zod.coerce.date(),
   "description": zod.string().nullish(),
-  "sourcePage": zod.number().nullish()
+  "sourcePage": zod.number().nullish(),
+  "sourceText": zod.string().nullish(),
+  "confidence": zod.number().nullish()
+})).optional(),
+  "actionPlan": zod.array(zod.object({
+  "priority": zod.enum(['urgent', 'high', 'medium', 'low']),
+  "recommendedAction": zod.string(),
+  "rationale": zod.string(),
+  "sourceText": zod.string().nullish(),
+  "deadline": zod.coerce.date().nullish(),
+  "reminderSuggested": zod.boolean(),
+  "reminderTitle": zod.string().nullish(),
+  "reminderType": zod.union([zod.literal('expiry'),zod.literal('renewal'),zod.literal('cancellation'),zod.literal('payment'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "confidence": zod.number()
 })).optional(),
   "suggestedQuestions": zod.array(zod.string()).optional(),
   "createdAt": zod.coerce.date(),
@@ -618,7 +765,7 @@ export const CreateReminderBody = zod.object({
   "contractId": zod.number(),
   "title": zod.string(),
   "reminderDate": zod.coerce.date(),
-  "type": zod.enum(['expiry', 'renewal', 'cancellation', 'payment', 'trial_end', 'warranty'])
+  "type": zod.enum(['expiry', 'renewal', 'cancellation', 'payment', 'trial_end', 'warranty', 'other'])
 })
 
 export const CreateReminderResponse = zod.object({

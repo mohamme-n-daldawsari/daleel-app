@@ -6,15 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ReminderInputType = typeof ReminderInputType[keyof typeof ReminderInputType];
+/**
+ * @nullable
+ */
+export type ActionPlanItemReminderType = typeof ActionPlanItemReminderType[keyof typeof ActionPlanItemReminderType] | null;
 
 
-export const ReminderInputType = {
+export const ActionPlanItemReminderType = {
   expiry: 'expiry',
   renewal: 'renewal',
   cancellation: 'cancellation',
   payment: 'payment',
-  trial_end: 'trial_end',
-  warranty: 'warranty',
   other: 'other',
 } as const;

@@ -13,11 +13,33 @@ import {
   analyzeContract,
   ContractAnalysisError,
   MAX_CONTRACT_TEXT_LENGTH,
+  type AnalysisResult,
 } from "../lib/aiService";
 import { logger } from "../lib/logger";
+import { persistContractAnalysis } from "../lib/analysisPersistence";
+import {
+  claimableAnalysisStatuses,
+  shouldReturnCachedAnalysis,
+  statusAfterAnalysisFailure,
+} from "../lib/analysisPolicy";
+import { DocumentExtractionError, extractContractText } from "../lib/documentExtraction";
+import {
+  SAMPLE_ANALYSIS,
+  SAMPLE_CONTRACT_FILE_NAME,
+  SAMPLE_CONTRACT_TEXT,
+} from "../lib/demoData";
+import { createArabicContractPdf } from "../lib/pdfReport";
 
 const router: IRouter = Router();
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+function parseStoredAnalysis(value: string | null): Partial<AnalysisResult> {
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as Partial<AnalysisResult>;
+  } catch {
+    return {};
+  }
+}
 
 // Helper to build full contract response
 async function buildContractResponse(contractId: number) {
@@ -32,13 +54,51 @@ async function buildContractResponse(contractId: number) {
     db.select({ cnt: count() }).from(contractClausesTable).where(and(eq(contractClausesTable.contractId, contractId), eq(contractClausesTable.riskLevel, "high"))),
   ]);
 
+  const stored = parseStoredAnalysis(contract.rawAnalysis);
+  const enrichedClauses = clauses.map((clause) => {
+    const rawClause = stored.clauses?.find(
+      (candidate) => candidate.category === clause.category && candidate.title === clause.title,
+    );
+    return {
+      ...clause,
+      sourceText: clause.sourceText ?? rawClause?.sourceText ?? null,
+      confidence: clause.confidence ?? rawClause?.confidence ?? null,
+    };
+  });
+  const enrichedDates = contractDates.map((item) => {
+    const rawDate = stored.contractDates?.find(
+      (candidate) => candidate.type === item.type && candidate.date === item.date,
+    );
+    return {
+      ...item,
+      sourceText: rawDate?.sourceText ?? null,
+      confidence: rawDate?.confidence ?? null,
+    };
+  });
+  const enrichedFinancialDetails = financialDetails.map((detail) => {
+    const rawDetail = stored.financialDetails?.find(
+      (candidate) =>
+        candidate.type === detail.type &&
+        candidate.amount === detail.amount &&
+        candidate.currency === detail.currency,
+    );
+    return {
+      ...detail,
+      sourceText: detail.sourceText ?? rawDetail?.sourceText ?? null,
+      confidence: rawDetail?.confidence ?? null,
+    };
+  });
+
   return {
     ...contract,
     parties,
-    clauses,
-    financialDetails,
-    contractDates,
+    clauses: enrichedClauses,
+    financialDetails: enrichedFinancialDetails,
+    contractDates: enrichedDates,
     highRiskCount: Number(highRiskClauses[0]?.cnt ?? 0),
+    overallRiskLevel: stored.overallRiskLevel ?? null,
+    actionPlan: stored.actionPlan ?? [],
+    isDemo: contract.originalFileName === SAMPLE_CONTRACT_FILE_NAME,
   };
 }
 
@@ -95,70 +155,19 @@ router.post("/contracts/upload", requireAuth, async (req, res): Promise<void> =>
     title?: string;
   };
 
-  let extractedText = pastedText ?? "";
-
-  if (extractedText.length > MAX_CONTRACT_TEXT_LENGTH) {
-    res.status(413).json({
-      error: `نص العقد كبير جداً. الحد الأقصى للتحليل هو ${MAX_CONTRACT_TEXT_LENGTH.toLocaleString("ar-SA")} حرف.`,
-    });
-    return;
-  }
-
-  // If file was provided, decode base64 and extract text
-  if (fileBase64 && fileName) {
-    const estimatedFileSize = Math.floor((fileBase64.length * 3) / 4);
-    if (estimatedFileSize > MAX_FILE_SIZE_BYTES) {
-      res.status(413).json({ error: "حجم الملف كبير جداً. الحد الأقصى المسموح به هو 10 ميجابايت." });
+  let extractedText: string;
+  try {
+    extractedText = await extractContractText({ pastedText, fileBase64, fileName, fileType });
+  } catch (error) {
+    if (error instanceof DocumentExtractionError) {
+      res.status(error.status).json({ error: error.message });
       return;
     }
-
-    try {
-      const buffer = Buffer.from(fileBase64, "base64");
-      if (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
-        try {
-          const { PDFParse } = await import("pdf-parse");
-          const parser = new PDFParse({ data: buffer });
-          try {
-            const pdfData = await parser.getText();
-            extractedText = pdfData.text || "";
-          } finally {
-            await parser.destroy();
-          }
-        } catch (error) {
-          req.log.warn(
-            { errorName: error instanceof Error ? error.name : "UnknownError" },
-            "PDF text extraction failed",
-          );
-          res.status(422).json({
-            error: "تعذر استخراج نص من ملف PDF. تأكد أن الملف يحتوي على نص قابل للقراءة وليس صورة ممسوحة ضوئياً.",
-          });
-          return;
-        }
-      } else {
-        res.status(415).json({
-          error: "تحليل الصور غير متاح حالياً لأن استخراج النص OCR غير مفعّل. ارفع ملف PDF نصياً أو الصق نص العقد.",
-        });
-        return;
-      }
-    } catch (error) {
-      req.log.warn(
-        { errorName: error instanceof Error ? error.name : "UnknownError" },
-        "File processing failed",
-      );
-      res.status(422).json({ error: "تعذر قراءة الملف المرفوع. يرجى التحقق من الملف والمحاولة مرة أخرى." });
-      return;
-    }
-  }
-
-  extractedText = extractedText.trim();
-  if (extractedText.length < 50) {
-    res.status(422).json({ error: "نص العقد قصير جداً أو غير قابل للقراءة. يلزم 50 حرفاً على الأقل." });
-    return;
-  }
-  if (extractedText.length > MAX_CONTRACT_TEXT_LENGTH) {
-    res.status(413).json({
-      error: `العقد كبير جداً للتحليل. الحد الأقصى هو ${MAX_CONTRACT_TEXT_LENGTH.toLocaleString("ar-SA")} حرف.`,
-    });
+    req.log.warn(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Contract text extraction failed",
+    );
+    res.status(422).json({ error: "تعذر قراءة الملف المرفوع. تحقق من الملف وحاول مرة أخرى." });
     return;
   }
 
@@ -181,6 +190,43 @@ router.post("/contracts/upload", requireAuth, async (req, res): Promise<void> =>
 
   const full = await buildContractResponse(contract.id);
   res.status(201).json(full);
+});
+
+// POST /contracts/sample — creates one fictional, pre-analyzed contract per user.
+// It never calls OpenAI and therefore consumes no API credit.
+router.post("/contracts/sample", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.dbUser!.id;
+  const [existing] = await db
+    .select({ id: contractsTable.id })
+    .from(contractsTable)
+    .where(
+      and(
+        eq(contractsTable.userId, userId),
+        eq(contractsTable.originalFileName, SAMPLE_CONTRACT_FILE_NAME),
+      ),
+    );
+
+  if (existing) {
+    res.json(await buildContractResponse(existing.id));
+    return;
+  }
+
+  const [contract] = await db
+    .insert(contractsTable)
+    .values({
+      userId,
+      title: SAMPLE_ANALYSIS.title,
+      contractType: SAMPLE_ANALYSIS.contractType,
+      originalFileName: SAMPLE_CONTRACT_FILE_NAME,
+      language: "ar",
+      extractedText: SAMPLE_CONTRACT_TEXT,
+      status: "pending",
+    })
+    .returning();
+
+  await persistContractAnalysis(contract.id, contract.title, SAMPLE_ANALYSIS as AnalysisResult);
+  await logActivity(userId, "create_sample_contract", "contract", contract.id);
+  res.status(201).json(await buildContractResponse(contract.id));
 });
 
 // GET /contracts/compare — must be before /:contractId
@@ -318,7 +364,7 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
     force?: boolean;
   };
 
-  if (contract.status === "analyzed" && !force) {
+  if (shouldReturnCachedAnalysis(contract.status, force)) {
     const cached = await buildContractResponse(contractId);
     res.json(cached);
     return;
@@ -333,9 +379,7 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
 
   // A paid re-analysis must be explicitly forced. The atomic status update
   // prevents duplicate concurrent API calls for both initial and repeat runs.
-  const claimableStatuses = force
-    ? ["pending", "analyzed", "failed"]
-    : ["pending"];
+  const claimableStatuses = claimableAnalysisStatuses(force);
   const [claimed] = await db
     .update(contractsTable)
     .set({ status: "processing" })
@@ -374,91 +418,7 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
       outputLanguage,
     );
 
-    await db.transaction(async (tx) => {
-      await tx.update(contractsTable).set({
-        status: "analyzed",
-        title: analysis.title || contract.title,
-        summary: analysis.summary,
-        startDate: analysis.startDate,
-        endDate: analysis.endDate,
-        duration: analysis.duration,
-        totalCost: analysis.totalCost,
-        currency: analysis.currency,
-        monthlyPayment: analysis.monthlyPayment,
-        annualPayment: analysis.annualPayment,
-        deposit: analysis.deposit,
-        automaticRenewal: analysis.automaticRenewal,
-        renewalNoticeDays: analysis.renewalNoticeDays,
-        cancellationAllowed: analysis.cancellationAllowed,
-        cancellationNoticeDays: analysis.cancellationNoticeDays,
-        earlyCancellationPenalty: analysis.earlyCancellationPenalty,
-        refundPolicy: analysis.refundPolicy,
-        trialPeriodDays: analysis.trialPeriodDays,
-        clarityScore: analysis.clarityScore,
-        clarityExplanation: analysis.clarityExplanation,
-        confidence: analysis.confidence,
-        suggestedQuestions: analysis.suggestedQuestions,
-        rawAnalysis: JSON.stringify(analysis),
-      }).where(eq(contractsTable.id, contractId));
-
-      // A PostgreSQL transaction uses one client connection, so its queries must
-      // run sequentially. Running these deletes concurrently triggers pg's
-      // "client is already executing a query" warning and will fail in pg 9.
-      await tx.delete(contractPartiesTable).where(eq(contractPartiesTable.contractId, contractId));
-      await tx.delete(contractClausesTable).where(eq(contractClausesTable.contractId, contractId));
-      await tx.delete(contractFinancialDetailsTable).where(eq(contractFinancialDetailsTable.contractId, contractId));
-      await tx.delete(contractDatesTable).where(eq(contractDatesTable.contractId, contractId));
-
-      if (analysis.parties.length) {
-        await tx.insert(contractPartiesTable).values(
-          analysis.parties.map((party) => ({
-            contractId,
-            name: party.name,
-            role: party.role,
-          })),
-        );
-      }
-
-      if (analysis.clauses.length) {
-        await tx.insert(contractClausesTable).values(
-          analysis.clauses.map((clause) => ({
-            contractId,
-            category: clause.category,
-            title: clause.title,
-            simpleExplanation: clause.simpleExplanation,
-            riskLevel: clause.riskLevel,
-            sourcePage: clause.sourcePage,
-            sourceText: clause.sourceText,
-            confidence: null,
-          })),
-        );
-      }
-
-      if (analysis.financialDetails.length) {
-        await tx.insert(contractFinancialDetailsTable).values(
-          analysis.financialDetails.map((detail) => ({
-            contractId,
-            type: detail.type,
-            amount: detail.amount,
-            currency: detail.currency,
-            description: detail.description,
-            sourcePage: detail.sourcePage,
-          })),
-        );
-      }
-
-      if (analysis.contractDates.length) {
-        await tx.insert(contractDatesTable).values(
-          analysis.contractDates.map((contractDate) => ({
-            contractId,
-            type: contractDate.type,
-            date: contractDate.date,
-            description: contractDate.description,
-            sourcePage: contractDate.sourcePage,
-          })),
-        );
-      }
-    });
+    await persistContractAnalysis(contractId, contract.title, analysis);
 
     await logActivity(userId, "analyze_contract", "contract", contractId);
 
@@ -471,7 +431,7 @@ router.post("/contracts/:contractId/analyze", requireAuth, async (req, res): Pro
     );
     await db
       .update(contractsTable)
-      .set({ status: contract.status === "analyzed" ? "analyzed" : "failed" })
+      .set({ status: statusAfterAnalysisFailure(contract.status) })
       .where(eq(contractsTable.id, contractId));
     res.status(502).json({
       error:
@@ -507,40 +467,27 @@ router.get("/contracts/:contractId/export/:format", requireAuth, async (req, res
     return;
   }
 
-  // PDF export — return a simple text-based report
-  const report = `
-DALEEL | دليل - Contract Analysis Report
-==========================================
-Contract: ${full.title}
-Type: ${full.contractType}
-Status: ${full.status}
-Clarity Score: ${full.clarityScore ?? "N/A"}/100
-Analysis Date: ${new Date().toLocaleDateString()}
+  if (format !== "pdf") {
+    res.status(400).json({ error: "صيغة التصدير غير مدعومة." });
+    return;
+  }
 
-DISCLAIMER:
-Daleel helps users understand contracts and identify important clauses. 
-It does not provide legal advice and does not replace consultation with a qualified legal professional.
-دليل يساعدك على فهم العقود والعثور على البنود المهمة، لكنه لا يقدم استشارة قانونية.
-
-SUMMARY:
-${full.summary ?? "No summary available."}
-
-PARTIES:
-${full.parties.map((p) => `- ${p.name} (${p.role})`).join("\n")}
-
-FINANCIAL DETAILS:
-${full.financialDetails.map((f) => `- ${f.type}: ${f.amount} ${f.currency} — ${f.description ?? ""}`).join("\n")}
-
-KEY DATES:
-${full.contractDates.map((d) => `- ${d.type}: ${d.date} — ${d.description ?? ""}`).join("\n")}
-
-IMPORTANT CLAUSES:
-${full.clauses.map((c) => `[${c.riskLevel.toUpperCase()}] ${c.title}\n  ${c.simpleExplanation}${c.sourcePage ? `\n  Source: Page ${c.sourcePage}` : ""}`).join("\n\n")}
-`;
-
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="daleel-report-${contractId}.txt"`);
-  res.send(report);
+  try {
+    const report = await createArabicContractPdf(full);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="daleel-report-${contractId}.pdf"`);
+    res.send(report);
+  } catch (error) {
+    req.log.error(
+      {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: error instanceof Error ? error.message : "Unknown PDF generation error",
+        contractId,
+      },
+      "PDF report generation failed",
+    );
+    res.status(500).json({ error: "تعذر إنشاء تقرير PDF حالياً. يرجى المحاولة مرة أخرى." });
+  }
 });
 
 // GET /contracts/:contractId/clauses

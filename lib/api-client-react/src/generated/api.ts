@@ -826,6 +826,77 @@ export const useUploadContract = <TError = ErrorType<unknown>,
       return useMutation(getUploadContractMutationOptions(options));
     }
 
+export const getCreateSampleContractUrl = () => {
+
+
+
+
+  return `/api/contracts/sample`
+}
+
+/**
+ * @summary Create or return the fictional pre-analyzed sample contract
+ */
+export const createSampleContract = async ( options?: RequestInit): Promise<Contract> => {
+
+  return customFetch<Contract>(getCreateSampleContractUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateSampleContractMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSampleContract>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSampleContract>>, TError,void, TContext> => {
+
+const mutationKey = ['createSampleContract'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSampleContract>>, void> = () => {
+
+
+          return  createSampleContract(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSampleContractMutationResult = NonNullable<Awaited<ReturnType<typeof createSampleContract>>>
+
+    export type CreateSampleContractMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or return the fictional pre-analyzed sample contract
+ */
+export const useCreateSampleContract = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSampleContract>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSampleContract>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateSampleContractMutationOptions(options));
+    }
+
 export const getGetContractUrl = (contractId: number,) => {
 
 

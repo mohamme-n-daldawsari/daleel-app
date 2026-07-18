@@ -5,8 +5,10 @@
  * Daleel - AI-powered contract analysis platform
  * OpenAPI spec version: 0.1.0
  */
+import type { ActionPlanItem } from './actionPlanItem';
 import type { Clause } from './clause';
 import type { ContractDate } from './contractDate';
+import type { ContractOverallRiskLevel } from './contractOverallRiskLevel';
 import type { ContractStatus } from './contractStatus';
 import type { FinancialDetail } from './financialDetail';
 import type { Party } from './party';
@@ -28,6 +30,9 @@ export interface Contract {
   clarityExplanation?: string | null;
   /** @nullable */
   confidence?: number | null;
+  /** @nullable */
+  overallRiskLevel?: ContractOverallRiskLevel;
+  isDemo?: boolean;
   /** @nullable */
   summary?: string | null;
   parties?: Party[];
@@ -64,6 +69,7 @@ export interface Contract {
   clauses?: Clause[];
   financialDetails?: FinancialDetail[];
   contractDates?: ContractDate[];
+  actionPlan?: ActionPlanItem[];
   suggestedQuestions?: string[];
   createdAt: Date;
   updatedAt?: Date;

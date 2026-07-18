@@ -17,4 +17,6 @@ export interface FinancialDetail {
   sourcePage?: number | null;
   /** @nullable */
   sourceText?: string | null;
+  /** @nullable */
+  confidence?: number | null;
 }
